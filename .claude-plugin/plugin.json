@@ -1,0 +1,7 @@
+{
+  "name": "image-gen",
+  "version": "0.2.0",
+  "description": "AI image generation with expert prompt engineering. Supports fal.ai, Together AI, Replicate, OpenAI, Stability AI via API, and Higgsfield Nano Banana Pro / Google Gemini via browser automation.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["image", "generate", "ai", "flux", "dall-e", "higgsfield", "nano-banana", "gemini", "avatar", "icon", "prompt-engineering"]
+}
