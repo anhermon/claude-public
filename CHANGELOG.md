@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.2] — 2026-04-07
+
+### Fixed
+
+- **Marketplace catalog empty in UI** — plugin entries now use `git-subdir` sources pointing at `plugins/<name>/` in this repo. Relative paths only resolve when the marketplace is added as a full Git checkout; URL-only installs only fetch `marketplace.json`, so listings showed no plugins.
+
 ## [0.2.1] — 2026-04-07
 
 ### Added

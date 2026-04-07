@@ -10,6 +10,8 @@ This repository is a **marketplace**: it includes [`.claude-plugin/marketplace.j
 
 Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under [`plugins/`](./plugins/).
 
+Plugin entries use **`git-subdir`** sources so the catalog works whether you add this repo as a Git marketplace or paste a direct URL to `marketplace.json` (relative `./plugins/...` paths only work when the full repo is cloned).
+
 ## Install a plugin
 
 ```bash
