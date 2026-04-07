@@ -1,0 +1,16 @@
+{
+  "name": "code-review",
+  "version": "1.0.0",
+  "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "review",
+    "code-review",
+    "security",
+    "quality",
+    "git",
+    "pr"
+  ]
+}

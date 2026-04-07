@@ -3,6 +3,8 @@
 Thank you for your interest in contributing! This repo is Angel Hermon's public collection
 of Claude Code plugins. Contributions that add useful, well-crafted plugins are welcome.
 
+**Layout:** Each plugin’s source lives under `plugins/<name>/` (manifest, README, and skill). The repo root holds `<name>.plugin` zip files built from those directories, and [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) lists every plugin for Claude Code’s marketplace UI.
+
 ---
 
 ## What is a plugin?
@@ -16,6 +18,8 @@ README.md                    ← user-facing description (required)
 skills/<name>/SKILL.md       ← skill instructions (required)
 ```
 
+Author new plugins under `plugins/<name>/` using the same layout; the zip is just that tree packaged for direct installs.
+
 The `SKILL.md` is a markdown file with YAML front matter that Claude reads as a skill:
 it defines when to trigger and provides step-by-step instructions for Claude to follow.
 
@@ -26,7 +30,7 @@ it defines when to trigger and provides step-by-step instructions for Claude to 
 | Item | Convention | Example |
 |------|------------|---------|
 | Plugin file | `<name>.plugin` | `commit.plugin` |
-| Skill directory | `skills/<name>/` | `skills/commit/` |
+| Skill directory | `plugins/<name>/skills/<name>/` | `plugins/commit/skills/commit/` |
 | Skill name | lowercase, hyphenated | `code-review` |
 | Version | semver `X.Y.Z` | `1.0.0` |
 
@@ -85,8 +89,8 @@ Brief intro.
 The `.plugin` file is a standard zip archive. You can create it with any zip tool:
 
 ```bash
-# From the directory containing .claude-plugin/, README.md, and skills/
-zip -r my-skill.plugin .claude-plugin/ README.md skills/my-skill/
+cd plugins/my-skill
+zip -r ../../my-skill.plugin .claude-plugin/ README.md skills/
 ```
 
 Or use Node.js, Python, or any zip library. The file must be a valid ZIP with no
@@ -102,8 +106,9 @@ compression (stored) or deflate compression — both work with Claude Code.
    ```
 
 2. **Add your files:**
-   - `my-skill.plugin` — the installable zip
-   - `skills/my-skill/SKILL.md` — source skill (for review and discoverability)
+   - `plugins/my-skill/` — `.claude-plugin/plugin.json`, `README.md`, and `skills/my-skill/SKILL.md`
+   - `my-skill.plugin` — zip of that directory (see above), at repo root
+   - An entry in [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) (`name`, `source`, `description`, `version`)
 
 3. **Test the plugin locally:**
    ```bash

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.1] — 2026-04-07
+
+### Added
+
+- **Claude Code marketplace** — [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) so the repository URL `https://github.com/anhermon/claude-public` registers as a marketplace (lists `commit`, `code-review`, and `image-gen`).
+
+### Changed
+
+- Canonical plugin sources live under [`plugins/<name>/`](./plugins/); root `<name>.plugin` zips are generated from those trees. Removed the duplicate top-level `skills/` copy and the old root-only `.claude-plugin/plugin.json` (which only described `image-gen`).
+
 ## [0.2.0] — 2026-04-04
 
 ### Added — image-gen plugin

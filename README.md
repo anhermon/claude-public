@@ -2,6 +2,14 @@
 
 Angel Hermon's public collection of Claude Code plugins — install them directly from GitHub.
 
+## Claude Code marketplace
+
+This repository is a **marketplace**: it includes [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json). In Claude Code, add the marketplace URL:
+
+`https://github.com/anhermon/claude-public`
+
+Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under [`plugins/`](./plugins/).
+
 ## Install a plugin
 
 ```bash

@@ -1,0 +1,15 @@
+{
+  "name": "commit",
+  "version": "1.0.0",
+  "description": "Write conventional commits automatically. Stages changes, analyzes the diff, and crafts a Conventional Commits message with the right type, scope, and summary.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "conventional-commits",
+    "workflow",
+    "productivity"
+  ]
+}
