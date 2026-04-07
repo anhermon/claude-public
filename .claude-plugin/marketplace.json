@@ -1,8 +1,10 @@
 {
   "name": "claude-public",
-  "description": "Public Claude Code plugins — conventional commits, code review, and AI image generation",
   "owner": {
     "name": "Angel Hermon"
+  },
+  "metadata": {
+    "description": "Public Claude Code plugins — conventional commits, code review, and AI image generation"
   },
   "plugins": [
     {
