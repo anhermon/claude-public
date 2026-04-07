@@ -1,0 +1,26 @@
+{
+  "name": "claude-public",
+  "owner": {
+    "name": "Angel Hermon"
+  },
+  "plugins": [
+    {
+      "name": "commit",
+      "source": "./plugins/commit",
+      "description": "Write conventional commits automatically. Stages changes, analyzes the diff, and crafts a Conventional Commits message with the right type, scope, and summary.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "code-review",
+      "source": "./plugins/code-review",
+      "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "image-gen",
+      "source": "./plugins/image-gen",
+      "description": "AI image generation with expert prompt engineering. Supports fal.ai, Together AI, Replicate, OpenAI, Stability AI via API, and Higgsfield Nano Banana Pro / Google Gemini via browser automation.",
+      "version": "0.2.0"
+    }
+  ]
+}
