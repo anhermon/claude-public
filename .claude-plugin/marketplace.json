@@ -1,5 +1,4 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-public",
   "description": "Public Claude Code plugins — conventional commits, code review, and AI image generation",
   "owner": {
@@ -10,6 +9,9 @@
       "name": "commit",
       "description": "Write conventional commits automatically. Stages changes, analyzes the diff, and crafts a Conventional Commits message with the right type, scope, and summary.",
       "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
@@ -21,6 +23,9 @@
       "name": "code-review",
       "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels.",
       "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
@@ -32,6 +37,9 @@
       "name": "image-gen",
       "description": "AI image generation with expert prompt engineering. Supports fal.ai, Together AI, Replicate, OpenAI, Stability AI via API, and Higgsfield Nano Banana Pro / Google Gemini via browser automation.",
       "version": "0.2.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
