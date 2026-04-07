@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3] — 2026-04-07
+
+### Fixed
+
+- **Claude Desktop marketplace validation** — each catalog entry now includes a top-level `author` object. The desktop app’s `listAvailablePlugins` check requires this field; missing it can surface as an empty “No plugins available.” list.
+- Removed the `$schema` URL from `marketplace.json` (that URL currently 404s; some clients treat an invalid schema pointer as a hard validation failure).
+
 ## [0.2.2] — 2026-04-07
 
 ### Fixed

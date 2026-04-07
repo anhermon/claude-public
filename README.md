@@ -10,7 +10,20 @@ This repository is a **marketplace**: it includes [`.claude-plugin/marketplace.j
 
 Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under [`plugins/`](./plugins/).
 
-Plugin entries use **`git-subdir`** sources so the catalog works whether you add this repo as a Git marketplace or paste a direct URL to `marketplace.json` (relative `./plugins/...` paths only work when the full repo is cloned).
+Plugin entries use **`git-subdir`** sources so each plugin can be fetched from this monorepo without separate repositories.
+
+### If the catalog shows “No plugins available”
+
+1. **Refresh or re-add** the marketplace after updates, or run **`/plugin marketplace update`** (Desktop) / `claude plugin marketplace update` (CLI).
+
+2. **Claude Desktop / Cowork** may validate the catalog strictly (for example every entry needs an **`author`** field) or route third-party marketplaces through a remote sync path that [does not load external plugin sources yet](https://github.com/anthropics/claude-code/issues/41653). If the UI stays empty, install from the **terminal** (often more reliable for custom marketplaces):
+
+   ```bash
+   claude plugin marketplace add https://github.com/anhermon/claude-public
+   claude plugin install commit@claude-public
+   ```
+
+   Use `code-review` or `image-gen` instead of `commit` for the other plugins.
 
 ## Install a plugin
 
