@@ -1,0 +1,22 @@
+{
+  "name": "llm-wiki",
+  "version": "1.0.0",
+  "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "wiki",
+    "knowledge-base",
+    "markdown",
+    "obsidian",
+    "documentation",
+    "ingest",
+    "query",
+    "lint",
+    "learnings"
+  ],
+  "skills": [
+    "skills/llm-wiki"
+  ]
+}
