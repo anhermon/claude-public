@@ -62,6 +62,20 @@
         "path": "plugins/agent-repo-search",
         "ref": "main"
       }
+    },
+    {
+      "name": "llm-wiki",
+      "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/llm-wiki",
+        "ref": "main"
+      }
     }
   ]
 }

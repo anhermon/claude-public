@@ -94,6 +94,17 @@ STABILITY_API_KEY=...
 
 ---
 
+### llm-wiki
+**v1.0.0** — Persistent markdown wiki maintenance for Obsidian.
+
+Maintain a living knowledge base by absorbing source documents, answering questions with citations, auditing for drift, and capturing session insights.
+
+**Trigger phrases:** "ingest this", "add to wiki", "log this to KB", "lint the wiki", "check the KB", "find stale pages", "query the wiki"
+
+No prerequisites. Vault defaults to `~/knowledge-base/`.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to author and submit plugins.
