@@ -1,0 +1,10 @@
+{
+  "name": "agent-repo-search",
+  "version": "0.1.0",
+  "description": "Skill for efficiently searching and ingesting large codebases using a structural index and CXML chunks.",
+  "entrypoint": "skills/agent-repo-search/SKILL.md",
+  "capabilities": [
+    "search",
+    "ingestion"
+  ]
+}
