@@ -15,8 +15,5 @@
     "query",
     "lint",
     "learnings"
-  ],
-  "skills": [
-    "skills/llm-wiki"
   ]
 }
