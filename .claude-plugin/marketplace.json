@@ -1,11 +1,11 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-public",
   "owner": {
-    "name": "Angel Hermon"
+    "name": "Angel Hermon",
+    "email": "angel@example.com"
   },
-  "metadata": {
-    "description": "Public Claude Code plugins — conventional commits, code review, AI image generation, and large codebase search"
-  },
+  "description": "Public Claude Code plugins — conventional commits, code review, AI image generation, and large codebase search",
   "plugins": [
     {
       "name": "commit",
