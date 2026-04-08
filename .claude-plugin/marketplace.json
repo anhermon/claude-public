@@ -4,7 +4,7 @@
     "name": "Angel Hermon"
   },
   "metadata": {
-    "description": "Public Claude Code plugins — conventional commits, code review, and AI image generation"
+    "description": "Public Claude Code plugins — conventional commits, code review, AI image generation, and large codebase search"
   },
   "plugins": [
     {
@@ -46,6 +46,20 @@
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
         "path": "plugins/image-gen",
+        "ref": "main"
+      }
+    },
+    {
+      "name": "agent-repo-search",
+      "description": "Efficiently search and ingest large codebases using structural indexing and token-aware CXML chunking.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/agent-repo-search",
         "ref": "main"
       }
     }
