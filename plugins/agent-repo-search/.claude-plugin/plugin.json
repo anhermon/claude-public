@@ -1,10 +1,15 @@
 {
   "name": "agent-repo-search",
   "version": "0.1.0",
-  "description": "Skill for efficiently searching and ingesting large codebases using a structural index and CXML chunks.",
-  "entrypoint": "skills/agent-repo-search/SKILL.md",
-  "capabilities": [
+  "description": "Efficiently search and ingest large codebases using structural indexing and token-aware CXML chunking.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
     "search",
-    "ingestion"
+    "ingestion",
+    "codebase",
+    "structural-search",
+    "cxml"
   ]
 }
