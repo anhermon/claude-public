@@ -1,7 +1,8 @@
 {
   "name": "claude-public",
   "owner": {
-    "name": "Angel Hermon"
+    "name": "Angel Hermon",
+    "email": "angel@dealhub.io"
   },
   "metadata": {
     "description": "Public Claude Code plugins — conventional commits, code review, AI image generation, large codebase search, and persistent knowledge management"
