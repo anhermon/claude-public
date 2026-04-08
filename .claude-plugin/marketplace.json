@@ -9,9 +9,7 @@
   "plugins": [
     {
       "name": "commit",
-      "metadata": {
-        "description": "Write conventional commits automatically. Stages changes, analyzes the diff, and crafts a Conventional Commits message with the right type, scope, and summary."
-      },
+      "description": "Write conventional commits automatically. Stages changes, analyzes the diff, and crafts a Conventional Commits message with the right type, scope, and summary.",
       "version": "1.0.0",
       "author": {
         "name": "Angel Hermon"
@@ -25,9 +23,7 @@
     },
     {
       "name": "code-review",
-      "metadata": {
-        "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels."
-      },
+      "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels.",
       "version": "1.0.0",
       "author": {
         "name": "Angel Hermon"
@@ -41,9 +37,7 @@
     },
     {
       "name": "image-gen",
-      "metadata": {
-        "description": "AI image generation with expert prompt engineering. Supports fal.ai, Together AI, Replicate, OpenAI, Stability AI via API, and Higgsfield Nano Banana Pro / Google Gemini via browser automation."
-      },
+      "description": "AI image generation with expert prompt engineering. Supports fal.ai, Together AI, Replicate, OpenAI, Stability AI via API, and Higgsfield Nano Banana Pro / Google Gemini via browser automation.",
       "version": "0.2.0",
       "author": {
         "name": "Angel Hermon"
@@ -57,9 +51,7 @@
     },
     {
       "name": "agent-repo-search",
-      "metadata": {
-        "description": "Efficiently search and ingest large codebases using structural indexing and token-aware CXML chunking."
-      },
+      "description": "Efficiently search and ingest large codebases using structural indexing and token-aware CXML chunking.",
       "version": "0.1.0",
       "author": {
         "name": "Angel Hermon"
@@ -73,9 +65,7 @@
     },
     {
       "name": "llm-wiki",
-      "metadata": {
-        "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/."
-      },
+      "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/.",
       "version": "1.0.0",
       "author": {
         "name": "Angel Hermon"
