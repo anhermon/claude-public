@@ -129,7 +129,7 @@ No prerequisites. Requires Langfuse account (optional for local-only).
 
 ## Development Philosophy
 
-**Purpose:** This repo is the Claude Code fork — improved dev tooling and a learning knowledge base. Plugins here are not context-specific and aim to be useful to any Claude Code user.
+**Purpose:** This repo hosts claude plugins marketplace — improved dev tooling and a learning knowledge base. Plugins here are not context-specific and aim to be useful to any Claude Code user.
 
 ### Evolution Workflow
 
