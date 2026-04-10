@@ -15,8 +15,10 @@ Convert a markdown directory into a single-page HTML wiki.
 
 ## Run
 
+`$SKILL_BASE_DIR` is the base directory shown at the top of this skill when it was loaded by Claude Code.
+
 ```bash
-python /Users/angelhermon/.claude/skills/kb-to-wiki/scripts/kb-to-wiki.py \
+python "$SKILL_BASE_DIR/scripts/kb-to-wiki.py" \
   --source ~/knowledge-base \
   --output wiki.html \
   --title "My Knowledge Base" \
