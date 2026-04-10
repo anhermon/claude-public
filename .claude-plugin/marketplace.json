@@ -65,6 +65,20 @@
       }
     },
     {
+      "name": "search",
+      "description": "Precise codebase exploration using ripgrep and tree-sitter. Finds definitions, call sites, and usages with structural awareness.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/search",
+        "ref": "main"
+      }
+    },
+    {
       "name": "llm-wiki",
       "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/. Includes kb-to-wiki skill for publishing the KB as a browsable HTML wiki.",
       "version": "1.1.0",
@@ -89,6 +103,20 @@
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
         "path": "plugins/setup-telemetry",
+        "ref": "main"
+      }
+    },
+    {
+      "name": "research",
+      "description": "Research a topic via AutoResearchClaw (full 23-stage pipeline → paper) or Regular Research (fast Claude synthesis).",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/research",
         "ref": "main"
       }
     }
