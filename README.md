@@ -61,6 +61,17 @@ No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
 
 ---
 
+### memory
+**v1.0.0** — Long-term memory management using the Memory Palace (MemPalace) pattern.
+
+Persists project facts, user preferences, and session snapshots to a structured `.memory/` directory.
+
+**Trigger phrases:** \"remember this\", \"recall from memory\", \"save my preferences\", \"load my memory\", \"manage project context\"
+
+No prerequisites. Storage defaults to `.memory/` in current project or `~/.memory/` globally.
+
+---
+
 ### agent-repo-search
 **v0.1.0** — Structural indexing and CXML chunking for massive codebases.
 
