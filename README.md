@@ -72,6 +72,17 @@ No prerequisites. Storage defaults to `.memory/` in current project or `~/.memor
 
 ---
 
+### pm
+**v1.0.0** — BMAD Project Manager Agent.
+
+Orchestrates software projects through the full 7-phase BMAD lifecycle: Ideation → PRD → Architecture → Stories → Implementation → QA → Integration.
+
+**Trigger phrases:** \"/pm\", \"start a project\", \"resume project\", \"orchestrate this build\", \"BMAD lifecycle\"
+
+No prerequisites. Persists state to `.memory/pm-state.json`.
+
+---
+
 ### agent-repo-search
 **v0.1.0** — Structural indexing and CXML chunking for massive codebases.
 
