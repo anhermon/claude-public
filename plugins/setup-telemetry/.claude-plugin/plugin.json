@@ -1,0 +1,17 @@
+{
+  "name": "setup-telemetry",
+  "version": "1.0.0",
+  "description": "Configure Claude Code telemetry hooks. Two setup paths — lightweight Langfuse cloud (quick start) or self-hosted custom dashboard + FastAPI backend (full observability, no cloud).",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "telemetry",
+    "observability",
+    "claude-hooks",
+    "langfuse",
+    "dashboard",
+    "monitoring"
+  ],
+  "license": "MIT"
+}
