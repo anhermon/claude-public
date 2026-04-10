@@ -50,8 +50,38 @@ claude install anhermon/claude-public/commit.plugin
 ### image-gen
 **v0.2.0** — AI image generation with expert prompt engineering.
 
+### search
+**v1.0.0** — Precise codebase exploration using ripgrep and tree-sitter.
+
+Finds definitions, call sites, and usages with structural awareness. Faster and more precise than default search for large codebases.
+
+**Trigger phrases:** \"search for\", \"find where X is defined\", \"trace call sites of X\", \"how is X used\", \"explore the codebase\"
+
+No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
+
+---
+
 ### agent-repo-search
-**v0.1.0** — Efficiently search and ingest large codebases using structural indexing and token-aware CXML chunking.
+**v0.1.0** — Structural indexing and CXML chunking for massive codebases.
+
+Efficiently search and ingest repositories that exceed context limits using structural indexing.
+
+**Trigger phrases:** \"ingest repo\", \"search indexed repo\", \"use structural search\"
+
+Requires `uv` and `python 3.10+`.
+
+---
+
+### research
+**v1.0.0** — Research any topic via AutoResearchClaw or Regular Research.
+
+Autonomous 23-stage pipeline (ResearchClaw) for academic-depth papers or fast Claude-native synthesis (Regular Research) for structured briefs.
+
+**Trigger phrases:** \"research X\", \"/research\", \"investigate X\", \"look into X\", \"write a paper on X\", \"give me a brief on X\"
+
+No prerequisites. Web search capability recommended.
+
+---
 
 ### llm-wiki
 **v1.1.0** — Persistent markdown wiki maintenance for Obsidian.
@@ -89,23 +119,6 @@ This repo evolves through usage, not roadmaps:
 4. **Branch** — Implement on feature branches. One concern per branch.
 5. **Benchmark** — CI runs the benchmark suite on every PR. Scores are emitted as `benchmark-results.json` in a standard format.
 6. **Merge** — Only merge when benchmarks confirm the change improves (or at minimum does not regress) the overall score.
-
-### Branch Model
-
-This repo uses long-lived branches with benchmark-driven pruning:
-
-1. **Develop parallel branches** — Multiple approaches to the same problem can coexist.
-2. **Evaluate and compare** — The same benchmark suite runs on each branch for side-by-side comparison.
-3. **Pick winner / drop loser** — Higher benchmark score wins. The losing branch is cancelled.
-4. **Release candidate** — The winner is promoted to an RC for final validation.
-5. **Merge to main** — Only after RC passes all gates.
-
-### Benchmark-Driven Merge Decisions
-
-- PRs that regress the overall score below threshold are blocked.
-- When competing branches solve the same problem, CI compares their scores and recommends the winner.
-- Post-merge regressions trigger revert recommendations.
-- Benchmark history is tracked via CI artifacts for trend analysis.
 
 ---
 

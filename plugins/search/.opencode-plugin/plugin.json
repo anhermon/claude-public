@@ -1,0 +1,8 @@
+{
+  "name": "code-search",
+  "description": "ripgrep + tree-sitter code search skill — structural and textual search patterns for codebase exploration",
+  "author": {
+    "name": "DealHub Infra"
+  },
+  "agents": ["explore"]
+}
