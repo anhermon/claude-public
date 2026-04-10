@@ -66,8 +66,8 @@
     },
     {
       "name": "llm-wiki",
-      "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/.",
-      "version": "1.0.0",
+      "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/. Includes kb-to-wiki skill for publishing the KB as a browsable HTML wiki.",
+      "version": "1.1.0",
       "author": {
         "name": "Angel Hermon"
       },
