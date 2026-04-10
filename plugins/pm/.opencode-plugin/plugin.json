@@ -1,0 +1,16 @@
+{
+  "name": "pm",
+  "description": "BMAD Project Manager — orchestrate software projects through the full BMAD lifecycle: Ideation → PRD → Architecture → Stories → Implementation → QA → Integration",
+  "author": {
+    "name": "DealHub Infra"
+  },
+  "agents": [
+    "pm-orchestrator",
+    "pm-analyst",
+    "pm-product-manager",
+    "pm-architect",
+    "pm-scrum-master",
+    "pm-developer",
+    "pm-qa"
+  ]
+}
