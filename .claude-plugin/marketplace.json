@@ -77,6 +77,20 @@
         "path": "plugins/llm-wiki",
         "ref": "main"
       }
+    },
+    {
+      "name": "setup-telemetry",
+      "description": "Instrument Claude with Langfuse telemetry and local dashboard. Visualizes session metrics, tool usage, and performance insights.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/setup-telemetry",
+        "ref": "main"
+      }
     }
   ]
 }
