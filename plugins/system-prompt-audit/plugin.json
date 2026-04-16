@@ -1,0 +1,17 @@
+{
+  "name": "system-prompt-audit",
+  "version": "1.0.0",
+  "description": "Audits and refines agent system prompts against context engineering best practices. Runs a nine-dimension structured audit covering context efficiency, role clarity, instruction specificity, safety guardrails, and output format consistency.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "system-prompt",
+    "context-engineering",
+    "audit",
+    "agent",
+    "optimization",
+    "tokens",
+    "heartbeat"
+  ]
+}
