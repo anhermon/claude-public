@@ -511,13 +511,21 @@ def detect_parallel_sprawl(sessions_by_project):
 
 # ─── Time series ─────────────────────────────────────────────────────────────
 
-def build_time_series(all_sessions_flat, scores_by_session):
+def build_time_series(all_sessions_flat, scores_by_session, project_by_session=None):
     """
     Aggregate sessions by calendar day for trend charts.
-    Returns a list of dicts sorted by date: [{date, cost, sessions,
-    avg_cache_hit_rate, avg_waste_score}].
+    Returns list of dicts sorted by date, each with aggregate totals plus
+    per-project cost breakdown and per-waste-category score sums.
     """
-    days = defaultdict(lambda: {"cost": 0.0, "sessions": 0, "cache_hit_sum": 0.0, "waste_sum": 0.0})
+    def _empty_day():
+        return {
+            "cost": 0.0, "sessions": 0,
+            "cache_hit_sum": 0.0, "waste_sum": 0.0,
+            "by_project": defaultdict(float),
+            "by_waste":   defaultdict(float),
+        }
+    days = defaultdict(_empty_day)
+
     for s in all_sessions_flat:
         raw = s.get("start_time")
         if not raw:
@@ -527,12 +535,22 @@ def build_time_series(all_sessions_flat, scores_by_session):
             day_key = t.strftime("%Y-%m-%d")
         except Exception:
             continue
-        sid = s.get("session_id", "")
-        scr = scores_by_session.get(sid, {})
-        days[day_key]["cost"] += s.get("estimated_cost", 0) or 0
+        sid  = s.get("session_id", "")
+        scr  = scores_by_session.get(sid, {})
+        cost = s.get("estimated_cost", 0) or 0
+
+        days[day_key]["cost"]     += cost
         days[day_key]["sessions"] += 1
         days[day_key]["cache_hit_sum"] += cache_hit_rate_pct(s)
-        days[day_key]["waste_sum"] += scr.get("total_score", 0)
+        days[day_key]["waste_sum"]     += scr.get("total_score", 0)
+
+        if project_by_session:
+            slug = (project_by_session.get(sid) or {}).get("slug", "other")
+            days[day_key]["by_project"][slug] += cost
+
+        for cat, val in (scr.get("scores") or {}).items():
+            if val > 0:
+                days[day_key]["by_waste"][cat] += val
 
     result = []
     for day_key in sorted(days.keys()):
@@ -544,6 +562,8 @@ def build_time_series(all_sessions_flat, scores_by_session):
             "sessions":           n,
             "avg_cache_hit_rate": round(d["cache_hit_sum"] / n, 1) if n else 0,
             "avg_waste_score":    round(d["waste_sum"] / n, 1) if n else 0,
+            "by_project":         {k: round(v, 2) for k, v in d["by_project"].items()},
+            "by_waste":           {k: round(v, 1) for k, v in d["by_waste"].items()},
         })
     return result
 
@@ -745,7 +765,7 @@ def build_spec(
     heatmap = build_heatmap(all_sessions_flat)
 
     # ── Time series (all sessions aggregated by day) ───────────────────────────
-    time_series = build_time_series(all_sessions_flat, scores_by_session)
+    time_series = build_time_series(all_sessions_flat, scores_by_session, project_by_session)
 
     # ── Summary ───────────────────────────────────────────────────────────────
     summary = {

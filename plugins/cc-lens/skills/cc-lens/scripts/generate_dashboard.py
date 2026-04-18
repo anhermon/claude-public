@@ -21,24 +21,52 @@ def safe_json(obj) -> str:
 
 
 def slim_replay(replay) -> dict | None:
-    """Strip replay to chart-only data (index, cost, tokens, tool_count). No text."""
+    """Preserve per-turn cost, token, and tool-call details for drilldown inspection."""
     if not replay:
         return None
     raw_turns = replay if isinstance(replay, list) else replay.get("turns", [])
     turns = []
-    for i, t in enumerate(raw_turns):
+    turn_idx = 0
+    for t in raw_turns:
         if not isinstance(t, dict):
             continue
         if t.get("type") != "assistant":
             continue
         usage = t.get("usage") or {}
+        tcs = []
+        for tc in (t.get("tool_calls") or []):
+            if not isinstance(tc, dict):
+                continue
+            name = tc.get("name", "?")
+            inp = tc.get("input") or {}
+            if isinstance(inp, dict):
+                if name == "Bash":
+                    s = str(inp.get("command", ""))[:120]
+                elif name in ("Read", "Write", "Edit", "MultiEdit"):
+                    s = str(inp.get("file_path", ""))[:120]
+                elif name == "Grep":
+                    pat = inp.get("pattern", "")
+                    path = inp.get("path", "")
+                    s = (f"{pat}" + (f" in {path}" if path else ""))[:120]
+                elif name == "Glob":
+                    s = str(inp.get("pattern", ""))[:120]
+                elif name in ("Agent", "Skill"):
+                    s = str(inp.get("description", inp.get("skill", inp.get("prompt", ""))))[:120]
+                elif name in ("WebFetch", "WebSearch"):
+                    s = str(inp.get("url", inp.get("query", "")))[:120]
+                else:
+                    s = next((str(v)[:120] for v in inp.values() if isinstance(v, str) and v), "")
+            else:
+                s = ""
+            tcs.append({"n": name, "s": s})
         turns.append({
-            "i": i,
+            "i": turn_idx,
             "cost": round(t.get("estimated_cost", 0), 6),
             "in": usage.get("input_tokens", 0),
             "out": usage.get("output_tokens", 0),
-            "tools": len(t.get("tool_calls") or []),
+            "tcs": tcs,
         })
+        turn_idx += 1
     return {"turns": turns[:120]} if turns else None
 
 # ─── Waste category metadata ──────────────────────────────────────────────────
@@ -141,6 +169,7 @@ def build_sessions_js(sessions):
         result[sid] = {
             "session_id": sid,
             "project_name": s.get("project_name", ""),
+            "start_time": s.get("start_time", ""),
             "estimated_cost": s.get("estimated_cost", 0),
             "duration_minutes": s.get("duration_minutes", 0),
             "cache_hit_rate_pct": s.get("cache_hit_rate_pct", 0),
@@ -207,16 +236,19 @@ def generate_html(spec: dict) -> str:
             })
         radar_data = {"labels": radar_labels, "datasets": radar_datasets}
 
-    waste_labels_json = safe_json(WASTE_LABELS)
-    waste_colors_json = safe_json(WASTE_COLORS)
-    waste_fixes_json  = safe_json(WASTE_FIXES)
-    scatter_json      = safe_json(scatter_datasets)
-    projects_bar_json = safe_json(projects_bar)
-    sessions_js_json  = safe_json(sessions_js)
-    radar_json        = safe_json(radar_data)
-    heatmap_json      = safe_json(heatmap)
-    time_series_json  = safe_json(time_series)
-    thresholds_json   = safe_json(thresholds)
+    slug_to_display = {p.get("slug", ""): p.get("display_name", p.get("slug", "")) for p in projects}
+
+    waste_labels_json    = safe_json(WASTE_LABELS)
+    waste_colors_json    = safe_json(WASTE_COLORS)
+    waste_fixes_json     = safe_json(WASTE_FIXES)
+    scatter_json         = safe_json(scatter_datasets)
+    projects_bar_json    = safe_json(projects_bar)
+    sessions_js_json     = safe_json(sessions_js)
+    radar_json           = safe_json(radar_data)
+    heatmap_json         = safe_json(heatmap)
+    time_series_json     = safe_json(time_series)
+    thresholds_json      = safe_json(thresholds)
+    slug_to_display_json = safe_json(slug_to_display)
 
     def fmt_cost(v):
         return f"${v:,.2f}"
@@ -236,12 +268,39 @@ def generate_html(spec: dict) -> str:
         m = int(mins % 60)
         return f"{h}h {m}m"
 
-    # Build table rows
+    def date_str(iso):
+        try:
+            dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+            return dt.strftime("%b %d %H:%M")
+        except Exception:
+            return ""
+
+    # WoW KPI: compare last 7 days vs prior 7 days
+    wow_cost_str, wow_waste_str, wow_cost_dir, wow_waste_dir = "—", "—", "", ""
+    if len(time_series) >= 7:
+        last7  = time_series[-7:]
+        prior7 = time_series[-14:-7] if len(time_series) >= 14 else []
+        c_now  = sum(d["cost"] for d in last7)
+        c_prev = sum(d["cost"] for d in prior7) if prior7 else None
+        w_now  = sum(d["avg_waste_score"] for d in last7) / len(last7)
+        w_prev = (sum(d["avg_waste_score"] for d in prior7) / len(prior7)) if prior7 else None
+        wow_cost_str  = fmt_cost(c_now)
+        wow_waste_str = f"{w_now:.1f}"
+        if c_prev is not None and c_prev > 0:
+            pct = (c_now - c_prev) / c_prev * 100
+            wow_cost_dir = f'<span style="color:{"var(--red)" if pct > 0 else "var(--green)"}">{"▲" if pct > 0 else "▼"} {abs(pct):.0f}% vs prev week</span>'
+        if w_prev is not None and w_prev > 0:
+            wpct = (w_now - w_prev) / w_prev * 100
+            wow_waste_dir = f'<span style="color:{"var(--red)" if wpct > 0 else "var(--green)"}">{"▲" if wpct > 0 else "▼"} {abs(wpct):.0f}%</span>'
+
+    # Build table rows (sorted by date desc by default)
+    top_sessions_by_date = sorted(top_sessions, key=lambda s: s.get("start_time", ""), reverse=True)
     table_rows = []
-    for s in top_sessions:
+    for s in top_sessions_by_date:
         sid = s.get("session_id", "")
         sid8 = sid[:8]
         proj = s.get("project_name", "")
+        dt   = date_str(s.get("start_time", ""))
         cost = fmt_cost(s.get("estimated_cost", 0))
         dur = dur_str(s.get("duration_minutes", 0))
         cache = f"{s.get('cache_hit_rate_pct', 0):.0f}%"
@@ -251,8 +310,10 @@ def generate_html(spec: dict) -> str:
         tw_label = WASTE_LABELS.get(tw, tw)
         tw_color = WASTE_COLORS.get(tw, "#64748b")
         sc = score_class(ws)
+        iso_date = (s.get("start_time", "") or "")[:10]
         table_rows.append(
-            f'<tr onclick="openDrilldown(\'{sid}\')" data-sid="{sid}">'
+            f'<tr onclick="openDrilldown(\'{sid}\')" data-sid="{sid}" data-date="{iso_date}">'
+            f'<td style="font-size:11px;color:var(--text-muted);white-space:nowrap">{dt}</td>'
             f'<td><a class="sid-link" onclick="event.stopPropagation();openDrilldown(\'{sid}\');return false;">{sid8}</a></td>'
             f'<td>{proj}</td>'
             f'<td class="num">{cost}</td>'
@@ -301,7 +362,11 @@ def generate_html(spec: dict) -> str:
   .dash-header .meta {{ color: var(--text-muted); font-size: 13px; }}
 
   /* ── KPI cards ── */
-  .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }}
+  .kpi-row {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }}
+  .date-filter {{ display:flex; align-items:center; gap:4px; }}
+  .filter-btn {{ background:var(--surface2); border:1px solid var(--border); color:var(--text-muted); padding:4px 12px; border-radius:4px; font-size:12px; cursor:pointer; }}
+  .filter-btn:hover {{ border-color:var(--accent); color:var(--text); }}
+  .filter-btn.active {{ background:var(--accent); border-color:var(--accent); color:#fff; }}
   .kpi-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }}
   .kpi-card .kpi-label {{ font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }}
   .kpi-card .kpi-value {{ font-size: 28px; font-weight: 700; color: var(--text); }}
@@ -376,6 +441,25 @@ def generate_html(spec: dict) -> str:
   .dd-chart-row {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }}
   .dd-chart-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }}
   .dd-chart-card h3 {{ font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }}
+
+  /* ── Turn details table ── */
+  .turn-details-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; }}
+  .turn-details-card h3 {{ font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }}
+  .turn-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+  .turn-table th {{ text-align: left; font-size: 11px; color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 6px 8px; white-space: nowrap; }}
+  .turn-table th.num {{ text-align: right; }}
+  .turn-table td {{ padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }}
+  .turn-row {{ cursor: pointer; }}
+  .turn-row:hover {{ background: var(--surface2); }}
+  .turn-row.highlighted {{ background: #6366f11a; outline: 1px solid var(--accent); }}
+  .tool-badge {{ display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); margin: 1px 2px 1px 0; white-space: nowrap; cursor: pointer; }}
+  .tool-badge:hover {{ border-color: var(--accent); color: var(--text); }}
+  .turn-detail-row td {{ background: var(--bg); padding: 0; }}
+  .tool-calls-list {{ padding: 8px 12px 12px 32px; display: flex; flex-direction: column; gap: 4px; }}
+  .tool-call-row {{ display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--border); }}
+  .tool-call-row:last-child {{ border-bottom: none; }}
+  .tool-call-name {{ min-width: 90px; font-size: 11px; font-weight: 600; color: var(--accent); padding: 1px 0; }}
+  .tool-call-summary {{ font-size: 12px; color: var(--text-muted); font-family: monospace; word-break: break-all; flex: 1; line-height: 1.5; }}
 </style>
 </head>
 <body>
@@ -411,6 +495,16 @@ def generate_html(spec: dict) -> str:
       <div class="kpi-label">Est. Savings</div>
       <div class="kpi-value" style="color:var(--green)">{fmt_cost(potential_savings)}</div>
       <div class="kpi-sub">if waste addressed</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Last 7 Days Cost</div>
+      <div class="kpi-value" style="font-size:20px">{wow_cost_str}</div>
+      <div class="kpi-sub">{wow_cost_dir}&nbsp;</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Waste Score (7d)</div>
+      <div class="kpi-value" style="font-size:20px">{wow_waste_str}</div>
+      <div class="kpi-sub">{wow_waste_dir}&nbsp;</div>
     </div>
   </div>
 
@@ -448,17 +542,31 @@ def generate_html(spec: dict) -> str:
     </div>
   </div>
 
-  <!-- Trends over time -->
+  <!-- Trends over time: 4 charts in 2×2 grid -->
   <div class="chart-row" id="trendRow">
     <div class="chart-card">
-      <h3>Daily Cost &amp; Sessions Over Time</h3>
+      <h3>Cost by Project Over Time</h3>
       <div class="chart-wrap" style="height:260px">
+        <canvas id="chartTimeProject"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Waste Category Breakdown Over Time</h3>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="chartTimeWaste"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="chart-row" id="trendRow2">
+    <div class="chart-card">
+      <h3>Daily Cost &amp; Sessions Over Time</h3>
+      <div class="chart-wrap" style="height:220px">
         <canvas id="chartTimeCost"></canvas>
       </div>
     </div>
     <div class="chart-card">
       <h3>Cache Hit Rate &amp; Avg Waste Score Over Time</h3>
-      <div class="chart-wrap" style="height:260px">
+      <div class="chart-wrap" style="height:220px">
         <canvas id="chartTimeTrend"></canvas>
       </div>
     </div>
@@ -466,18 +574,28 @@ def generate_html(spec: dict) -> str:
 
   <!-- Sessions table -->
   <div class="table-card">
-    <h3>Top Sessions (by cost)</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0">Sessions</h3>
+      <div class="date-filter">
+        <button class="filter-btn active" onclick="filterSessions(7,this)">7d</button>
+        <button class="filter-btn" onclick="filterSessions(14,this)">14d</button>
+        <button class="filter-btn" onclick="filterSessions(30,this)">30d</button>
+        <button class="filter-btn" onclick="filterSessions(0,this)">All</button>
+        <span id="filter-count" style="font-size:12px;color:var(--text-muted);margin-left:8px"></span>
+      </div>
+    </div>
     <table class="sessions" id="sessionsTable">
       <thead>
         <tr>
-          <th onclick="sortTable(0)">Session ID</th>
-          <th onclick="sortTable(1)">Project</th>
-          <th onclick="sortTable(2)" class="num">Cost</th>
-          <th onclick="sortTable(3)" class="num">Duration</th>
-          <th onclick="sortTable(4)" class="num">Cache Hit%</th>
-          <th onclick="sortTable(5)" class="num">Tools</th>
-          <th onclick="sortTable(6)" class="num">Waste</th>
-          <th onclick="sortTable(7)">Top Issue</th>
+          <th onclick="sortTable(0)">Date</th>
+          <th onclick="sortTable(1)">Session ID</th>
+          <th onclick="sortTable(2)">Project</th>
+          <th onclick="sortTable(3)" class="num">Cost</th>
+          <th onclick="sortTable(4)" class="num">Duration</th>
+          <th onclick="sortTable(5)" class="num">Cache Hit%</th>
+          <th onclick="sortTable(6)" class="num">Tools</th>
+          <th onclick="sortTable(7)" class="num">Waste</th>
+          <th onclick="sortTable(8)">Top Issue</th>
         </tr>
       </thead>
       <tbody id="sessionsBody">
@@ -504,6 +622,7 @@ const WASTE_FIXES = {waste_fixes_json};
 const THRESHOLDS = {thresholds_json};
 const HEATMAP_DATA = {heatmap_json};
 const TIME_SERIES = {time_series_json};
+const SLUG_TO_DISPLAY = {slug_to_display_json};
 const SCATTER_DATASETS = {scatter_json};
 const RADAR_DATA = {radar_json};
 const PROJECTS_BAR = {projects_bar_json};
@@ -672,10 +791,32 @@ Chart.defaults.animation = false;
   }}
 }})();
 
+// ── Date filter ───────────────────────────────────────────────────────────────
+function filterSessions(days, btn) {{
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const rows = document.querySelectorAll('#sessionsBody tr');
+  const cutoff = days > 0
+    ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    : null;
+  let visible = 0;
+  rows.forEach(row => {{
+    const d = row.getAttribute('data-date') || '';
+    const show = !cutoff || d >= cutoff;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  }});
+  const counter = document.getElementById('filter-count');
+  if (counter) counter.textContent = visible + ' session' + (visible !== 1 ? 's' : '');
+}}
+// Apply default 7-day filter on load
+document.addEventListener('DOMContentLoaded', () => filterSessions(7, document.querySelector('.filter-btn.active')));
+
 // ── Time series charts ────────────────────────────────────────────────────────
 (function() {{
   if (!TIME_SERIES || TIME_SERIES.length === 0) {{
     document.getElementById('trendRow').style.display = 'none';
+    document.getElementById('trendRow2').style.display = 'none';
     return;
   }}
   const labels = TIME_SERIES.map(d => d.date);
@@ -683,6 +824,81 @@ Chart.defaults.animation = false;
   const counts = TIME_SERIES.map(d => d.sessions);
   const cacheRates = TIME_SERIES.map(d => d.avg_cache_hit_rate);
   const wasteScores = TIME_SERIES.map(d => d.avg_waste_score);
+
+  // Chart 0: Cost by project (stacked area)
+  (function() {{
+    const projectColors = ['#6366f1','#f97316','#22c55e','#06b6d4','#ec4899','#8b5cf6','#f59e0b'];
+    const allSlugs = [...new Set(TIME_SERIES.flatMap(d => Object.keys(d.by_project || {{}})))];
+    // Sort slugs by total cost descending, take top 6, group rest as "other"
+    const slugTotals = {{}};
+    allSlugs.forEach(s => {{ slugTotals[s] = TIME_SERIES.reduce((a, d) => a + (d.by_project?.[s] || 0), 0); }});
+    const topSlugs = allSlugs.sort((a,b) => slugTotals[b]-slugTotals[a]).slice(0,6);
+
+    const datasets = topSlugs.map((slug, i) => {{
+      const color = projectColors[i % projectColors.length];
+      return {{
+        label: (function(n){{ return n.length > 22 ? n.slice(0,22)+'…' : n; }})(SLUG_TO_DISPLAY[slug] || slug),
+        data: TIME_SERIES.map(d => (d.by_project?.[slug] || 0)),
+        backgroundColor: color + '99',
+        borderColor: color,
+        borderWidth: 1,
+        fill: true,
+      }};
+    }});
+    // "other" bucket
+    const otherData = TIME_SERIES.map(d => {{
+      const topSum = topSlugs.reduce((a, s) => a + (d.by_project?.[s] || 0), 0);
+      return Math.max(0, d.cost - topSum);
+    }});
+    if (otherData.some(v => v > 0.01)) {{
+      datasets.push({{ label:'other', data: otherData, backgroundColor:'#64748b66', borderColor:'#64748b', borderWidth:1, fill:true }});
+    }}
+    new Chart(document.getElementById('chartTimeProject').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels, datasets }},
+      options: {{
+        animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ position:'bottom', labels:{{ boxWidth:12, padding:8 }} }},
+          tooltip: {{ callbacks: {{ label: item => `${{item.dataset.label}}: ${{fmtCost(item.raw)}}` }} }},
+        }},
+        scales: {{
+          x: {{ stacked:true, grid:{{color:'#334155'}}, ticks:{{color:'#94a3b8', maxTicksLimit:10}} }},
+          y: {{ stacked:true, grid:{{color:'#334155'}}, ticks:{{color:'#94a3b8', callback: v=>'$'+v.toFixed(0)}}, title:{{display:true, text:'Cost ($)', color:'#64748b'}} }},
+        }},
+      }},
+    }});
+  }})();
+
+  // Chart 1: Waste category breakdown over time (stacked bar)
+  (function() {{
+    const catKeys = Object.keys(WASTE_LABELS);
+    const datasets = catKeys.map(cat => {{
+      const color = WASTE_COLORS[cat];
+      return {{
+        label: WASTE_LABELS[cat],
+        data: TIME_SERIES.map(d => d.by_waste?.[cat] || 0),
+        backgroundColor: color + '99',
+        borderColor: color,
+        borderWidth: 1,
+      }};
+    }});
+    new Chart(document.getElementById('chartTimeWaste').getContext('2d'), {{
+      type: 'bar',
+      data: {{ labels, datasets }},
+      options: {{
+        animation: false, responsive: true, maintainAspectRatio: false,
+        plugins: {{
+          legend: {{ position:'bottom', labels:{{ boxWidth:12, padding:8 }} }},
+          tooltip: {{ callbacks: {{ label: item => `${{item.dataset.label}}: ${{item.raw.toFixed(0)}}` }} }},
+        }},
+        scales: {{
+          x: {{ stacked:true, grid:{{color:'#334155'}}, ticks:{{color:'#94a3b8', maxTicksLimit:10}} }},
+          y: {{ stacked:true, grid:{{color:'#334155'}}, ticks:{{color:'#94a3b8'}}, title:{{display:true, text:'Waste Score Sum', color:'#64748b'}} }},
+        }},
+      }},
+    }});
+  }})();
 
   // Chart 1: cost (bar) + session count (line, right axis)
   new Chart(document.getElementById('chartTimeCost').getContext('2d'), {{
@@ -972,12 +1188,20 @@ function openDrilldown(sid) {{
       </div>
       ${{s.replay ? `
       <div class="dd-chart-card">
-        <h3>Turn-by-Turn Cost</h3>
+        <h3>Turn-by-Turn Cost <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0">(click bar to jump to turn)</span></h3>
         <div style="position:relative;height:260px">
           <canvas id="ddReplayChart"></canvas>
         </div>
       </div>` : '<div></div>'}}
     </div>`;
+
+  const turnDetailsHTML = s.replay && s.replay.turns && s.replay.turns.length > 0 ? `
+    <div class="turn-details-card">
+      <h3>Turn Details <span style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0">— click a row to expand tool calls</span></h3>
+      <div style="max-height:420px;overflow-y:auto">
+        <div id="turn-details-container"></div>
+      </div>
+    </div>` : '';
 
   ddContent.innerHTML = `
     <div class="dd-header">
@@ -991,6 +1215,7 @@ function openDrilldown(sid) {{
     ${{findingsHTML}}
     ${{cacheHTML}}
     ${{chartsHTML}}
+    ${{turnDetailsHTML}}
   `;
 
   // Render tool chart
@@ -1040,7 +1265,7 @@ function openDrilldown(sid) {{
     }});
   }}
 
-  // Replay chart
+  // Replay chart + turn details table
   if (s.replay && s.replay.turns && s.replay.turns.length > 0) {{
     const turns = s.replay.turns;
     const rCtx = document.getElementById('ddReplayChart').getContext('2d');
@@ -1067,11 +1292,15 @@ function openDrilldown(sid) {{
               label: (item) => {{
                 const t = turns[item.dataIndex];
                 const lines = [`Cost: ${{fmtCost(item.raw)}}`];
-                if (t && t.tools) lines.push(`Tool calls: ${{t.tools}}`);
+                const ntools = t && t.tcs ? t.tcs.length : 0;
+                if (ntools > 0) lines.push(`Tool calls: ${{ntools}}`);
                 return lines;
               }}
             }}
           }}
+        }},
+        onClick: (evt, elements) => {{
+          if (elements.length > 0) highlightTurnRow(elements[0].index);
         }},
         scales: {{
           x: {{ grid: {{ color: '#334155' }}, ticks: {{ color: '#94a3b8' }} }},
@@ -1079,6 +1308,8 @@ function openDrilldown(sid) {{
         }}
       }}
     }});
+
+    renderTurnTable(turns, 'turn-details-container');
   }}
 
   window.scrollTo(0, 0);
@@ -1122,6 +1353,76 @@ function buildDefaultFinding(cat, score, s) {{
     default:
       return `Waste category score: ${{score}}/100.`;
   }}
+}}
+
+function escHtml(str) {{
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}}
+
+function renderTurnTable(turns, containerId) {{
+  const container = document.getElementById(containerId);
+  if (!container || !turns || !turns.length) return;
+
+  let html = `<table class="turn-table">
+    <thead><tr>
+      <th class="num" style="width:40px">#</th>
+      <th class="num" style="width:80px">Cost</th>
+      <th class="num" style="width:70px">In</th>
+      <th class="num" style="width:70px">Out</th>
+      <th>Tool Calls</th>
+    </tr></thead><tbody>`;
+
+  turns.forEach((t, idx) => {{
+    const tcs = t.tcs || [];
+    const badges = tcs.map(tc =>
+      `<span class="tool-badge">${{escHtml(tc.n)}}</span>`
+    ).join('');
+    const details = tcs.map(tc =>
+      `<div class="tool-call-row">
+        <span class="tool-call-name">${{escHtml(tc.n)}}</span>
+        <span class="tool-call-summary">${{escHtml(tc.s)}}</span>
+      </div>`
+    ).join('');
+
+    html += `<tr class="turn-row" id="turn-row-${{idx}}" onclick="toggleTurnRow(${{idx}})">
+      <td class="num" style="color:var(--text-muted);font-size:12px">${{t.i + 1}}</td>
+      <td class="num">${{fmtCost(t.cost)}}</td>
+      <td class="num" style="font-size:11px;color:var(--text-muted)">${{(t.in||0).toLocaleString()}}</td>
+      <td class="num" style="font-size:11px;color:var(--text-muted)">${{(t.out||0).toLocaleString()}}</td>
+      <td>${{badges || '<span style="color:var(--text-muted);font-size:11px">—</span>'}}</td>
+    </tr>`;
+    if (tcs.length > 0) {{
+      html += `<tr class="turn-detail-row" id="turn-detail-${{idx}}" style="display:none">
+        <td colspan="5"><div class="tool-calls-list">${{details}}</div></td>
+      </tr>`;
+    }}
+  }});
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}}
+
+function toggleTurnRow(idx) {{
+  const detail = document.getElementById(`turn-detail-${{idx}}`);
+  if (detail) detail.style.display = detail.style.display === 'none' ? 'table-row' : 'none';
+  const row = document.getElementById(`turn-row-${{idx}}`);
+  if (row) row.classList.toggle('highlighted');
+}}
+
+function highlightTurnRow(idx) {{
+  document.querySelectorAll('.turn-row').forEach(r => r.classList.remove('highlighted'));
+  document.querySelectorAll('.turn-detail-row').forEach(r => r.style.display = 'none');
+  const row = document.getElementById(`turn-row-${{idx}}`);
+  const detail = document.getElementById(`turn-detail-${{idx}}`);
+  if (row) {{
+    row.classList.add('highlighted');
+    row.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+  }}
+  if (detail) detail.style.display = 'table-row';
 }}
 
 function closeDrilldown() {{
