@@ -1,0 +1,8 @@
+{
+  "$schema": "https://claude.ai/plugin-schema/v1",
+  "name": "token-efficiency",
+  "version": "1.0.0",
+  "description": "Industry-standard knowledge base for LLM token efficiency — context window cost model, waste taxonomy (9 categories), caching architecture, prompt engineering guidelines, and optimization playbook ranked by ROI.",
+  "author": { "name": "Angel Hermon", "email": "angel.hermon@dealhub.io" },
+  "keywords": ["tokens", "efficiency", "optimization", "llm", "cost", "caching", "context-window"]
+}
