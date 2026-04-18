@@ -147,6 +147,34 @@
         "path": "plugins/research",
         "ref": "main"
       }
+    },
+    {
+      "name": "cc-lens",
+      "description": "Token usage intelligence for Claude Code — analyze session costs, identify waste categories (tool hammering, context bloat, cache inefficiency), and generate forensics HTML reports with actionable recommendations.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/cc-lens",
+        "ref": "main"
+      }
+    },
+    {
+      "name": "token-efficiency",
+      "description": "Industry-standard knowledge base for LLM token efficiency — context window cost model, waste taxonomy (9 categories), caching architecture, prompt engineering guidelines, and optimization playbook ranked by ROI.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/token-efficiency",
+        "ref": "main"
+      }
     }
   ]
 }
