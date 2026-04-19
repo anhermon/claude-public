@@ -29,6 +29,26 @@ unavoidable given its task complexity, say that too.
 
 ---
 
+## Phase 0: Rate-limit snapshot (context)
+
+Before analyzing waste, record current quota utilization. This anchors the analysis in what
+actually constrains the user right now (not just retrospective cost).
+
+```bash
+context-os limits --format json > /tmp/context-os-limits.json && context-os limits
+```
+
+Capture three numbers for the executive summary:
+
+- Active 5-hour window % of cap
+- Weekly rolling 7d total % of cap
+- Weekly Sonnet % of cap (highest-signal for most plans)
+
+If weekly Sonnet > 80%, flag it in the summary — recommendations should weight Sonnet-reduction
+patterns (cache stability, compaction) higher than generic waste.
+
+---
+
 ## Phase 1: Setup & Data Collection
 
 ### 1.1 Verify cc-lens is running
