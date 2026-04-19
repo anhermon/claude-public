@@ -1,0 +1,25 @@
+{
+  "name": "context-os-cli",
+  "version": "2.1.0",
+  "description": "npx/bunx shim for the context-os Python CLI (graph, sessions, cc-lens, ingest)",
+  "type": "module",
+  "bin": {
+    "context-os": "./cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "context_os",
+    "pyproject.toml",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "context-os",
+    "cc-lens",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

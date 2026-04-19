@@ -149,30 +149,16 @@
       }
     },
     {
-      "name": "cc-lens",
-      "description": "Token usage intelligence for Claude Code — analyze session costs, identify waste categories (tool hammering, context bloat, cache inefficiency), and generate forensics HTML reports with actionable recommendations.",
-      "version": "1.0.0",
+      "name": "context-os",
+      "description": "Unified context suite: knowledge graph (quickstart, ingest), session analytics (cc-lens + ccusage), token-efficiency playbook, context audit, and bundled context-os CLI. Replaces standalone cc-lens and token-efficiency plugins.",
+      "version": "2.1.1",
       "author": {
         "name": "Angel Hermon"
       },
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/anhermon/claude-public.git",
-        "path": "plugins/cc-lens",
-        "ref": "main"
-      }
-    },
-    {
-      "name": "token-efficiency",
-      "description": "Industry-standard knowledge base for LLM token efficiency — context window cost model, waste taxonomy (9 categories), caching architecture, prompt engineering guidelines, and optimization playbook ranked by ROI.",
-      "version": "1.0.0",
-      "author": {
-        "name": "Angel Hermon"
-      },
-      "source": {
-        "source": "git-subdir",
-        "url": "https://github.com/anhermon/claude-public.git",
-        "path": "plugins/token-efficiency",
+        "path": "plugins/context-os",
         "ref": "main"
       }
     }

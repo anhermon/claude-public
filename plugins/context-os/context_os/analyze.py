@@ -1,0 +1,1263 @@
+#!/usr/bin/env python3
+"""
+cc-lens analyzer — fetches data from cc-lens API, scores sessions using
+percentile-based thresholds computed from the actual dataset, and writes a
+JSON spec file consumed by the dashboard generator.
+
+Usage:
+    python analyze.py [--top-n N] [--sort-by cost|tokens] [--project SLUG]
+                      [--session ID_PREFIX] [--output PATH]
+"""
+
+import argparse
+import copy
+import json
+import sys
+import urllib.request
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+
+from context_os.cc_lens_url import resolve_cc_lens_base_url
+
+BASE_URL = "http://localhost:3001"
+
+# ─── Waste categories ──────────────────────────────────────────────────────────
+
+WASTE_CATEGORIES = [
+    "context_bloat",
+    "cache_inefficiency",
+    "tool_hammering",
+    "tool_pollution",
+    "compaction_absence",
+    "parallel_sprawl",
+    "interruption_loops",
+    "thinking_waste",
+]
+
+CATEGORY_LABELS = {
+    "context_bloat":      "Context Bloat",
+    "cache_inefficiency": "Cache Inefficiency",
+    "tool_hammering":     "Tool Hammering",
+    "tool_pollution":     "Tool Pollution",
+    "compaction_absence": "Compaction Absence",
+    "parallel_sprawl":    "Parallel Sprawl",
+    "interruption_loops": "Interruption Loops",
+    "thinking_waste":     "Thinking Waste",
+}
+
+CATEGORY_COLORS = {
+    "context_bloat":      "#ef4444",
+    "cache_inefficiency": "#f97316",
+    "tool_hammering":     "#6366f1",
+    "tool_pollution":     "#a855f7",
+    "compaction_absence": "#06b6d4",
+    "parallel_sprawl":    "#8b5cf6",
+    "interruption_loops": "#ec4899",
+    "thinking_waste":     "#84cc16",
+}
+
+CATEGORY_RECOMMENDATIONS = {
+    "context_bloat":      "Break into smaller focused sessions, run /compact when context feels large",
+    "cache_inefficiency": "Keep system prompts stable across turns, avoid randomizing tool descriptions",
+    "tool_hammering":     "Batch shell commands into fewer calls, use Agent for exploratory file searches",
+    "tool_pollution":     "Reduce MCP/tool call volume: batch reads, disable unused MCP servers, avoid redundant searches",
+    "compaction_absence": "Add /compact to your workflow for sessions >45 min, or configure auto-compaction in settings",
+    "parallel_sprawl":    "Consolidate work into fewer focused sessions; avoid multiple terminal windows on the same project",
+    "interruption_loops": "Write clearer prompts upfront, use TodoWrite for shared task state, reduce task scope per session",
+    "thinking_waste":     "Reserve extended thinking for complex reasoning; disable for routine file edits or searches",
+}
+
+CATEGORY_FIXES = {
+    "context_bloat":      "Break into smaller focused sessions, run /compact when context feels large.",
+    "cache_inefficiency": "Keep system prompts stable, avoid randomizing tool descriptions, use stable context blocks.",
+    "tool_hammering":     "Batch shell commands into fewer calls, use Agent for exploratory file searches.",
+    "tool_pollution":     "Lower total tool calls; trim MCP servers; batch file operations.",
+    "compaction_absence": "Add /compact to your workflow for sessions >45 min, or configure auto-compaction.",
+    "parallel_sprawl":    "Consolidate work into fewer focused sessions, avoid multiple terminal windows simultaneously.",
+    "interruption_loops": "Write clearer prompts upfront, use TodoWrite for shared task state, reduce scope per session.",
+    "thinking_waste":     "Reserve extended thinking for complex reasoning; disable for routine file edits or searches.",
+}
+
+
+# ─── API helpers ───────────────────────────────────────────────────────────────
+
+def api_get(path, timeout=60):
+    """GET from the cc-lens API. Returns parsed JSON or None on failure."""
+    url = f"{BASE_URL}{path}"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read())
+    except Exception as e:
+        print(f"[ERROR] GET {path}: {e}", file=sys.stderr)
+        return None
+
+
+def _extract_user_text(turn: dict) -> str:
+    """First human-readable string from a user turn."""
+    msg = turn.get("message") or turn
+    if isinstance(msg, dict):
+        c = msg.get("content")
+        if isinstance(c, str):
+            return c.strip()[:500]
+        if isinstance(c, list):
+            for block in c:
+                if isinstance(block, dict) and block.get("text"):
+                    return str(block["text"]).strip()[:500]
+    return ""
+
+
+def metrics_from_replay(replay_raw) -> dict:
+    """
+    Derive repeat reads, sequential-tool %, first user message, repeated-command text,
+    and per-assistant-turn cache-hit proxy for sparklines.
+    """
+    empty = {
+        "repeat_read_ratio_pct": None,
+        "sequential_tool_pct": None,
+        "first_user_message": "",
+        "repeat_recommendation": "",
+        "per_turn_cache_hit_pct": [],
+    }
+    if not replay_raw:
+        return empty
+
+    turns = replay_raw if isinstance(replay_raw, list) else replay_raw.get("turns", [])
+    first_user = ""
+    read_paths: list[str] = []
+    tool_signatures: list[str] = []
+    turns_with_tools = 0
+    single_tool_turns = 0
+    per_turn_cache: list[float | None] = []
+
+    for t in turns:
+        if not isinstance(t, dict):
+            continue
+        ttype = t.get("type", "")
+        if ttype == "user" and not first_user:
+            first_user = _extract_user_text(t)[:120]
+
+        if ttype != "assistant":
+            continue
+
+        usage = t.get("usage") or {}
+        cc = float(usage.get("cache_creation_input_tokens") or 0)
+        cr = float(usage.get("cache_read_input_tokens") or 0)
+        if cc + cr > 0:
+            per_turn_cache.append(round(cr / (cc + cr) * 100, 2))
+        else:
+            per_turn_cache.append(None)
+
+        tcs = t.get("tool_calls") or []
+        if not isinstance(tcs, list):
+            continue
+        n_tc = len(tcs)
+        if n_tc > 0:
+            turns_with_tools += 1
+            if n_tc == 1:
+                single_tool_turns += 1
+        for tc in tcs:
+            if not isinstance(tc, dict):
+                continue
+            name = tc.get("name", "?")
+            inp = tc.get("input") or {}
+            if isinstance(inp, dict):
+                if name == "Bash":
+                    sig = f"{name}:{str(inp.get('command', ''))[:100]}"
+                elif name in ("Read", "Write", "Edit", "MultiEdit"):
+                    fp = str(inp.get("file_path", ""))
+                    if name in ("Read", "Edit", "MultiEdit", "Write"):
+                        read_paths.append(fp)
+                    sig = f"{name}:{fp[:100]}"
+                elif name == "Grep":
+                    sig = f"{name}:{str(inp.get('pattern', ''))[:60]}"
+                elif name == "Glob":
+                    sig = f"{name}:{str(inp.get('pattern', ''))[:80]}"
+                else:
+                    sig = f"{name}:{str(next((v for v in inp.values() if isinstance(v, str) and v), ''))[:100]}"
+            else:
+                sig = str(name)
+            tool_signatures.append(sig)
+
+    total_reads = len(read_paths)
+    repeat_read_ratio_pct = None
+    if total_reads > 0:
+        cnt = Counter(read_paths)
+        dup = sum(c - 1 for c in cnt.values() if c > 1)
+        repeat_read_ratio_pct = round(min(100.0, dup / total_reads * 100.0), 1)
+
+    sequential_tool_pct = None
+    if turns_with_tools > 0:
+        sequential_tool_pct = round(single_tool_turns / turns_with_tools * 100.0, 1)
+
+    rep_cmd = ""
+    if tool_signatures:
+        c_sig = Counter(tool_signatures)
+        top = [(k, v) for k, v in c_sig.most_common(8) if v >= 3]
+        if top:
+            parts = [f"{k[:140]} ×{v}" for k, v in top]
+            rep_cmd = "Combine repeated work: " + "; ".join(parts)
+
+    spark = [x for x in per_turn_cache if x is not None]
+
+    return {
+        "repeat_read_ratio_pct": repeat_read_ratio_pct,
+        "sequential_tool_pct": sequential_tool_pct,
+        "first_user_message": first_user,
+        "repeat_recommendation": rep_cmd,
+        "per_turn_cache_hit_pct": spark[:200],
+    }
+
+
+def fetch_replays_parallel(sids: list[str], max_workers: int = 8) -> dict[str, object]:
+    """Fetch /api/sessions/{id}/replay for many sessions (bounded parallelism)."""
+
+    def _one(sid: str):
+        data = api_get(f"/api/sessions/{sid}/replay", timeout=90)
+        if isinstance(data, dict):
+            turns = data.get("turns", data)
+        elif isinstance(data, list):
+            turns = data
+        else:
+            turns = None
+        return sid, turns
+
+    out: dict[str, object] = {}
+    if not sids:
+        return out
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(_one, sid): sid for sid in sids}
+        for fut in as_completed(futures):
+            try:
+                sid, turns = fut.result()
+                out[sid] = turns
+            except Exception as e:
+                print(f"  [replay] error: {e}", file=sys.stderr, flush=True)
+    return out
+
+
+# ─── Percentile computation ────────────────────────────────────────────────────
+
+def percentile(values, p):
+    """Compute the p-th percentile (0–100) of a list using linear interpolation."""
+    if not values:
+        return 0
+    sorted_vals = sorted(v for v in values if v is not None)
+    if not sorted_vals:
+        return 0
+    n = len(sorted_vals)
+    if n == 1:
+        return sorted_vals[0]
+    idx = (p / 100.0) * (n - 1)
+    lo = int(idx)
+    hi = min(lo + 1, n - 1)
+    frac = idx - lo
+    return sorted_vals[lo] + frac * (sorted_vals[hi] - sorted_vals[lo])
+
+
+def rank_percentile_of(value, sorted_values):
+    """Return 0–100 percentile rank of value within a pre-sorted list."""
+    if not sorted_values:
+        return 50
+    n = len(sorted_values)
+    count_below = sum(1 for v in sorted_values if v < value)
+    return round(count_below / n * 100)
+
+
+def compute_thresholds(sessions):
+    """
+    Compute percentile thresholds from the actual session dataset.
+    Falls back to known real-world values when the dataset is too small (<10 qualifying samples).
+
+    Returns a dict with keys used throughout score_session().
+    """
+    # Cache reuse ratios — only for sessions with meaningful cache creation (>50K tokens)
+    cache_ratios = []
+    for s in sessions:
+        cc = s.get("cache_creation_input_tokens", 0) or 0
+        cr = s.get("cache_read_input_tokens", 0) or 0
+        if cc > 50_000:
+            cache_ratios.append(cr / cc)
+
+    # Max single-tool call count per session
+    max_tools = []
+    for s in sessions:
+        tc = s.get("tool_counts", {}) or {}
+        if tc:
+            max_tools.append(max(tc.values()))
+
+    # Cost values (positive only)
+    costs = [s.get("estimated_cost", 0) or 0 for s in sessions if (s.get("estimated_cost") or 0) > 0]
+
+    # Duration values (positive only)
+    durations = [s.get("duration_minutes", 0) or 0 for s in sessions if (s.get("duration_minutes") or 0) > 0]
+
+    # Cache creation token counts (positive only)
+    cache_creations = [
+        s.get("cache_creation_input_tokens", 0) or 0
+        for s in sessions
+        if (s.get("cache_creation_input_tokens") or 0) > 0
+    ]
+
+    def _p(vals, pct, fallback):
+        return percentile(vals, pct) if len(vals) >= 10 else fallback
+
+    return {
+        # Cache reuse ratio percentiles (ratio = cache_read / cache_create)
+        "cache_ratio_p10":    _p(cache_ratios, 10,  4.6),
+        "cache_ratio_p25":    _p(cache_ratios, 25,  9.5),
+        "cache_ratio_median": _p(cache_ratios, 50, 15.8),
+        "cache_ratio_p75":    _p(cache_ratios, 75, 25.4),
+
+        # Max single-tool call count percentiles
+        "max_tool_p25":       _p(max_tools, 25,   14),
+        "max_tool_p50":       _p(max_tools, 50,   28),
+        "max_tool_p75":       _p(max_tools, 75,   54),
+        "max_tool_p95":       _p(max_tools, 95,  143),
+
+        # Cost percentiles (USD)
+        "cost_p25":           _p(costs, 25,   5.4),
+        "cost_p50":           _p(costs, 50,  11.0),
+        "cost_p75":           _p(costs, 75,  24.3),
+        "cost_p95":           _p(costs, 95,  86.2),
+
+        # Duration percentiles (minutes)
+        "duration_p25":       _p(durations, 25,    3.6),
+        "duration_p50":       _p(durations, 50,   12.8),
+        "duration_p75":       _p(durations, 75,  156.0),
+        "duration_p95":       _p(durations, 95, 2998.0),
+
+        # Cache creation token count percentiles
+        "cache_create_p50":   _p(cache_creations, 50,   201_000),
+        "cache_create_p75":   _p(cache_creations, 75,   404_000),
+        "cache_create_p95":   _p(cache_creations, 95, 1_450_000),
+
+        # Raw sorted lists for rank-percentile lookups inside score_session
+        "_sorted_max_tools":    sorted(max_tools),
+        "_sorted_cache_ratios": sorted(cache_ratios),
+
+        "n": len(sessions),
+    }
+
+
+# ─── Per-session scoring ───────────────────────────────────────────────────────
+
+def score_session(s, thresholds):
+    """
+    Score one session across all waste categories using calibrated
+    percentile-based thresholds. Returns:
+        scores            — dict[category -> 0-100]
+        flags             — dict[category -> list[str]]
+        evidence          — dict[category -> {finding, recommendation}]
+        total_score       — int (average of non-zero category scores)
+        active_categories — list[(category, score)] sorted desc
+    """
+    scores = {c: 0 for c in WASTE_CATEGORIES}
+    flags  = {c: [] for c in WASTE_CATEGORIES}
+    evidence = {}
+
+    cache_create   = s.get("cache_creation_input_tokens", 0) or 0
+    cache_read     = s.get("cache_read_input_tokens", 0) or 0
+    output_tok     = s.get("output_tokens", 0) or 0
+    duration       = s.get("duration_minutes", 0) or 0
+    interruptions  = s.get("user_interruptions", 0) or 0
+    has_compaction = bool(s.get("has_compaction", False))
+    has_thinking   = bool(s.get("has_thinking", False))
+    tool_counts    = s.get("tool_counts", {}) or {}
+    # Use assistant_message_count if available, fall back to turn_count
+    assistant_msgs = s.get("assistant_message_count") or s.get("turn_count") or 1
+    assistant_msgs = max(assistant_msgs, 1)
+
+    max_single_tool = max(tool_counts.values(), default=0)
+    top_tool_name   = max(tool_counts, key=tool_counts.get) if tool_counts else "unknown"
+
+    t = thresholds  # shorthand
+
+    # ── 1. TOOL HAMMERING ─────────────────────────────────────────────────────
+    # Measures whether a single tool is called an unusually high number of times.
+    p25 = t["max_tool_p25"]
+    p50 = t["max_tool_p50"]
+    p75 = t["max_tool_p75"]
+    p95 = t["max_tool_p95"]
+
+    if max_single_tool > 0:
+        if max_single_tool >= p95:
+            # Top 5%: score 85–100
+            excess_ratio = min((max_single_tool - p95) / max(p95, 1), 1.0)
+            th_score = int(85 + excess_ratio * 15)
+            scores["tool_hammering"] = min(100, th_score)
+            # Compute approximate percentile rank for the finding string
+            sorted_mt = t.get("_sorted_max_tools", [])
+            rank_pct = rank_percentile_of(max_single_tool, sorted_mt)
+            top_pct = 100 - rank_pct
+            flags["tool_hammering"].append(
+                f"{top_tool_name} called {max_single_tool}× "
+                f"(dataset p95={p95:.0f}×, median={p50:.0f}×)"
+            )
+            evidence["tool_hammering"] = {
+                "finding": (
+                    f"{top_tool_name} called {max_single_tool}× "
+                    f"(dataset p95={p95:.0f}×, you are in the top {max(top_pct, 1):.0f}%)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["tool_hammering"],
+            }
+        elif max_single_tool >= p75:
+            # p75–p95: score 40–84
+            span = max(p95 - p75, 1)
+            frac = (max_single_tool - p75) / span
+            th_score = int(40 + frac * 44)
+            scores["tool_hammering"] = min(84, th_score)
+            flags["tool_hammering"].append(
+                f"{top_tool_name} called {max_single_tool}× "
+                f"(dataset p95={p95:.0f}×, median={p50:.0f}×)"
+            )
+            evidence["tool_hammering"] = {
+                "finding": (
+                    f"{top_tool_name} called {max_single_tool}× "
+                    f"(dataset p95={p95:.0f}×, above p75={p75:.0f}×)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["tool_hammering"],
+            }
+        else:
+            # Below p75: score 0–39 proportionally
+            span = max(p75, 1)
+            frac = max_single_tool / span
+            scores["tool_hammering"] = min(39, int(frac * 39))
+
+    # ── 1b. TOOL POLLUTION (total / MCP tool volume) ──────────────────────────
+    total_tool_calls = sum(tool_counts.values()) if tool_counts else 0
+    mcp_calls = sum(
+        c
+        for name, c in tool_counts.items()
+        if isinstance(name, str) and ("mcp" in name.lower() or name.lower().startswith("mcp"))
+    )
+    tp_score = 0
+    if total_tool_calls > 50:
+        excess = min((total_tool_calls - 50) / 100.0, 1.0)
+        tp_score = max(tp_score, int(60 + excess * 40))
+    if mcp_calls > 20:
+        excess = min((mcp_calls - 20) / 40.0, 1.0)
+        tp_score = max(tp_score, int(50 + excess * 50))
+    if tp_score > 0:
+        scores["tool_pollution"] = min(100, tp_score)
+        flags["tool_pollution"].append(
+            f"{total_tool_calls} tool calls total; MCP-named calls ≈ {mcp_calls}"
+        )
+        _find = f"High tool volume ({total_tool_calls} calls"
+        if mcp_calls:
+            _find += f", {mcp_calls} MCP-related"
+        _find += ")"
+        evidence["tool_pollution"] = {
+            "finding": _find,
+            "recommendation": CATEGORY_RECOMMENDATIONS["tool_pollution"],
+        }
+
+    # ── 2. CACHE INEFFICIENCY ─────────────────────────────────────────────────
+    # Only meaningful when cache_creation is substantial (>50K tokens).
+    # HIGH cache reuse ratio is NORMAL (median ~15.8×); LOW ratio is wasteful.
+    reuse_ratio = 0.0  # computed here, also used in context_bloat below
+    if cache_create > 50_000:
+        reuse_ratio = cache_read / cache_create
+
+        cr_p10    = t["cache_ratio_p10"]
+        cr_p25    = t["cache_ratio_p25"]
+        cr_median = t["cache_ratio_median"]
+
+        if reuse_ratio < cr_p10:
+            # Bottom 10%: score 70–100
+            frac = max(0.0, (cr_p10 - reuse_ratio) / max(cr_p10, 0.1))
+            frac = min(frac, 1.0)
+            ci_score = int(70 + frac * 30)
+            scores["cache_inefficiency"] = min(100, ci_score)
+            # Compute percentile rank for display
+            sorted_cr = t.get("_sorted_cache_ratios", [])
+            rank_pct = rank_percentile_of(reuse_ratio, sorted_cr)
+            flags["cache_inefficiency"].append(
+                f"Cache reuse ratio {reuse_ratio:.1f}× "
+                f"(dataset median {cr_median:.1f}×, yours is in bottom {max(rank_pct, 1):.0f}%)"
+            )
+            evidence["cache_inefficiency"] = {
+                "finding": (
+                    f"Cache reuse ratio {reuse_ratio:.1f}× "
+                    f"(dataset median {cr_median:.1f}×, in the bottom 10%)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["cache_inefficiency"],
+            }
+        elif reuse_ratio < cr_p25:
+            # p10–p25: score 30–69
+            span = max(cr_p25 - cr_p10, 0.1)
+            frac = (cr_p25 - reuse_ratio) / span
+            frac = min(max(frac, 0.0), 1.0)
+            ci_score = int(30 + frac * 39)
+            scores["cache_inefficiency"] = min(69, ci_score)
+            flags["cache_inefficiency"].append(
+                f"Cache reuse ratio {reuse_ratio:.1f}× "
+                f"(dataset median {cr_median:.1f}×, yours is in bottom 25%)"
+            )
+            evidence["cache_inefficiency"] = {
+                "finding": (
+                    f"Cache reuse ratio {reuse_ratio:.1f}× "
+                    f"(dataset median {cr_median:.1f}×, below p25={cr_p25:.1f}×)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["cache_inefficiency"],
+            }
+        # >= p25 → score stays 0 (normal or good reuse)
+
+    elif cache_create > 0:
+        # Small cache — compute ratio for context_bloat even if not scored here
+        reuse_ratio = cache_read / cache_create
+
+    # ── 3. CONTEXT BLOAT ──────────────────────────────────────────────────────
+    # Two independent signals:
+    #   (a) large context + low cache reuse (requires substantial cache creation)
+    #   (b) long session without /compact (independent of cache size — B-8 fix)
+    cb_score = 0
+
+    # Signal (a): large context + low reuse
+    if cache_create > t["cache_create_p50"]:
+        ci_score = scores["cache_inefficiency"]
+        if ci_score > 50 and cache_create > t["cache_create_p75"]:
+            cb_score = int(ci_score * 0.8)
+            flags["context_bloat"].append(
+                f"Large context ({cache_create // 1_000}K tokens) "
+                f"with low reuse ratio {reuse_ratio:.1f}×"
+            )
+            evidence["context_bloat"] = {
+                "finding": (
+                    f"Cache created {cache_create / 1_000_000:.1f}M tokens "
+                    f"with only {reuse_ratio:.1f}× reuse (median={t['cache_ratio_median']:.1f}×)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["context_bloat"],
+            }
+
+    # Signal (b): long session without /compact (fires regardless of cache size)
+    if duration > 120 and not has_compaction:
+        cb_score = max(cb_score, 40)
+        flags["context_bloat"].append(
+            f"{duration:.0f} min session with no /compact"
+        )
+        if "context_bloat" not in evidence:
+            evidence["context_bloat"] = {
+                "finding": (
+                    f"{duration:.0f} min session with "
+                    f"{cache_create // 1_000}K token context and no compaction"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["context_bloat"],
+            }
+
+    if cb_score > 0:
+        scores["context_bloat"] = min(100, cb_score)
+
+    # ── 4. COMPACTION ABSENCE ─────────────────────────────────────────────────
+    # Short sessions (<= 15 min) don't need compaction. Long ones do.
+    if not has_compaction:
+        if duration > 180:
+            # 180+ min: score 80–100
+            excess = min((duration - 180) / 300.0, 1.0)
+            ca_score = int(80 + excess * 20)
+            scores["compaction_absence"] = min(100, ca_score)
+            flags["compaction_absence"].append(f"{duration:.0f} min session without /compact")
+            evidence["compaction_absence"] = {
+                "finding": f"{duration:.0f} min session without /compact",
+                "recommendation": CATEGORY_RECOMMENDATIONS["compaction_absence"],
+            }
+        elif duration > 60:
+            # 60–180 min: score 40–79
+            frac = (duration - 60) / (180 - 60)
+            ca_score = int(40 + frac * 39)
+            scores["compaction_absence"] = min(79, ca_score)
+            flags["compaction_absence"].append(f"{duration:.0f} min session without /compact")
+            evidence["compaction_absence"] = {
+                "finding": f"{duration:.0f} min session without /compact",
+                "recommendation": CATEGORY_RECOMMENDATIONS["compaction_absence"],
+            }
+        elif duration > 15:
+            # 15–60 min: score 10–39
+            frac = (duration - 15) / (60 - 15)
+            ca_score = int(10 + frac * 29)
+            scores["compaction_absence"] = min(39, ca_score)
+            flags["compaction_absence"].append(f"{duration:.0f} min session without /compact")
+        # <= 15 min: score stays 0
+
+    # ── 5. INTERRUPTION LOOPS ─────────────────────────────────────────────────
+    if interruptions >= 10:
+        excess = min((interruptions - 10) / 10.0, 1.0)
+        il_score = int(80 + excess * 20)
+        scores["interruption_loops"] = min(100, il_score)
+        flags["interruption_loops"].append(f"{interruptions} user interruptions")
+        evidence["interruption_loops"] = {
+            "finding": f"{interruptions} user interruptions",
+            "recommendation": CATEGORY_RECOMMENDATIONS["interruption_loops"],
+        }
+    elif interruptions >= 5:
+        frac = (interruptions - 5) / (10 - 5)
+        il_score = int(40 + frac * 39)
+        scores["interruption_loops"] = min(79, il_score)
+        flags["interruption_loops"].append(f"{interruptions} user interruptions")
+        evidence["interruption_loops"] = {
+            "finding": f"{interruptions} user interruptions",
+            "recommendation": CATEGORY_RECOMMENDATIONS["interruption_loops"],
+        }
+    elif interruptions >= 3:
+        frac = (interruptions - 3) / (5 - 3)
+        il_score = int(20 + frac * 19)
+        scores["interruption_loops"] = min(39, il_score)
+        flags["interruption_loops"].append(f"{interruptions} user interruptions")
+
+    # ── 6. THINKING WASTE ─────────────────────────────────────────────────────
+    # Only scored when the session used extended thinking. Low output-per-turn
+    # while thinking is enabled indicates the thinking budget is not justified.
+    if has_thinking:
+        output_per_turn = output_tok / assistant_msgs
+        if output_per_turn < 50:
+            # Very low output relative to thinking: score 80–100
+            frac = max(0.0, (50 - output_per_turn) / 50.0)
+            tw_score = int(80 + frac * 20)
+            scores["thinking_waste"] = min(100, tw_score)
+            flags["thinking_waste"].append(
+                f"Extended thinking with avg {output_per_turn:.0f} tokens/response"
+            )
+            evidence["thinking_waste"] = {
+                "finding": (
+                    f"Extended thinking with avg {output_per_turn:.0f} tokens/response "
+                    f"(very low output)"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["thinking_waste"],
+            }
+        elif output_per_turn < 200:
+            # Moderate output: score 40–79
+            frac = (200 - output_per_turn) / (200 - 50)
+            tw_score = int(40 + frac * 39)
+            scores["thinking_waste"] = min(79, tw_score)
+            flags["thinking_waste"].append(
+                f"Extended thinking with avg {output_per_turn:.0f} tokens/response"
+            )
+            evidence["thinking_waste"] = {
+                "finding": (
+                    f"Extended thinking with avg {output_per_turn:.0f} tokens/response"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["thinking_waste"],
+            }
+        # >= 200 tokens/response → score stays 0 (output justifies thinking cost)
+
+    # ── 7. PARALLEL SPRAWL ────────────────────────────────────────────────────
+    # Computed at project level in detect_parallel_sprawl(); skipped per-session.
+
+    # ── Overall score: average of non-zero category scores ────────────────────
+    active_scores = [v for v in scores.values() if v > 0]
+    total_score = int(sum(active_scores) / len(active_scores)) if active_scores else 0
+
+    active_categories = sorted(
+        [(c, v) for c, v in scores.items() if v > 0],
+        key=lambda x: -x[1],
+    )
+
+    return {
+        "scores":            scores,
+        "flags":             flags,
+        "evidence":          evidence,
+        "total_score":       total_score,
+        "active_categories": active_categories,
+    }
+
+
+# ─── Project-level parallel sprawl ────────────────────────────────────────────
+
+def detect_parallel_sprawl(sessions_by_project):
+    """
+    Detect projects with concurrent session activity within 30-minute windows.
+    Returns dict[slug -> max_concurrent_sessions].
+    """
+    results = {}
+    for slug, sessions in sessions_by_project.items():
+        timestamps = []
+        for s in sessions:
+            raw = s.get("start_time")
+            if raw:
+                try:
+                    t = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    timestamps.append(t)
+                except Exception:
+                    pass
+        if len(timestamps) < 3:
+            results[slug] = 0
+            continue
+        timestamps.sort()
+        max_concurrent = 1
+        for i, t in enumerate(timestamps):
+            window_end = t + timedelta(minutes=30)
+            concurrent = sum(1 for other in timestamps[i + 1:] if other <= window_end)
+            max_concurrent = max(max_concurrent, concurrent + 1)
+        results[slug] = max_concurrent
+    return results
+
+
+# ─── Time series ─────────────────────────────────────────────────────────────
+
+def build_time_series(all_sessions_flat, scores_by_session, project_by_session=None):
+    """
+    Aggregate sessions by calendar day for trend charts.
+    Returns list of dicts sorted by date, each with aggregate totals plus
+    per-project cost breakdown and per-waste-category score sums.
+    """
+    def _empty_day():
+        return {
+            "cost": 0.0, "sessions": 0,
+            "cache_hit_sum": 0.0, "waste_sum": 0.0,
+            "by_project": defaultdict(float),
+            "by_waste":   defaultdict(float),
+        }
+    days = defaultdict(_empty_day)
+
+    for s in all_sessions_flat:
+        raw = s.get("start_time")
+        if not raw:
+            continue
+        try:
+            t = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            day_key = t.strftime("%Y-%m-%d")
+        except Exception:
+            continue
+        sid  = s.get("session_id", "")
+        scr  = scores_by_session.get(sid, {})
+        cost = s.get("estimated_cost", 0) or 0
+
+        days[day_key]["cost"]     += cost
+        days[day_key]["sessions"] += 1
+        days[day_key]["cache_hit_sum"] += cache_hit_rate_pct(s)
+        days[day_key]["waste_sum"]     += scr.get("total_score", 0)
+
+        if project_by_session:
+            slug = (project_by_session.get(sid) or {}).get("slug", "other")
+            days[day_key]["by_project"][slug] += cost
+
+        for cat, val in (scr.get("scores") or {}).items():
+            if val > 0:
+                days[day_key]["by_waste"][cat] += val
+
+    result = []
+    for day_key in sorted(days.keys()):
+        d = days[day_key]
+        n = d["sessions"]
+        result.append({
+            "date":               day_key,
+            "cost":               round(d["cost"], 2),
+            "sessions":           n,
+            "avg_cache_hit_rate": round(d["cache_hit_sum"] / n, 1) if n else 0,
+            "avg_waste_score":    round(d["waste_sum"] / n, 1) if n else 0,
+            "by_project":         {k: round(v, 2) for k, v in d["by_project"].items()},
+            "by_waste":           {k: round(v, 1) for k, v in d["by_waste"].items()},
+        })
+
+    # T-7: annotate each day with regression/improvement vs 7-day rolling prior average
+    for i, day in enumerate(result):
+        window = result[max(0, i - 7):i]
+        if len(window) >= 3:
+            avg_cost  = sum(d["cost"] for d in window) / len(window)
+            avg_waste = sum(d["avg_waste_score"] for d in window) / len(window)
+            cost_pct  = (day["cost"] - avg_cost) / avg_cost * 100 if avg_cost > 0 else 0
+            waste_pct = (day["avg_waste_score"] - avg_waste) / avg_waste * 100 if avg_waste > 0 else 0
+            day["regression"]       = "cost" if cost_pct > 20 else ("waste" if waste_pct > 20 else None)
+            day["improvement"]      = "cost" if cost_pct < -20 else ("waste" if waste_pct < -20 else None)
+            day["cost_vs_avg_pct"]  = round(cost_pct, 1)
+            day["waste_vs_avg_pct"] = round(waste_pct, 1)
+
+    return result
+
+
+# ─── Heatmap ──────────────────────────────────────────────────────────────────
+
+def build_heatmap(sessions):
+    """
+    Build a weekday × hour session-count matrix.
+    Keys are STRINGS (JSON-compatible, correct for JS object access).
+    Format: {"0": {"14": 3}, "1": {"15": 5}, ...}
+    Weekday 0 = Monday … 6 = Sunday.
+    """
+    heatmap = defaultdict(lambda: defaultdict(int))
+    for s in sessions:
+        raw = s.get("start_time")
+        if raw:
+            try:
+                t = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                heatmap[t.weekday()][t.hour] += 1
+            except Exception:
+                pass
+    return {
+        str(day): {str(hour): count for hour, count in hours.items()}
+        for day, hours in heatmap.items()
+    }
+
+
+# ─── Helper: cache hit rate ────────────────────────────────────────────────────
+
+def cache_hit_rate_pct(s):
+    """Percentage of total input tokens that were served from cache."""
+    cc  = s.get("cache_creation_input_tokens", 0) or 0
+    cr  = s.get("cache_read_input_tokens", 0) or 0
+    inp = s.get("input_tokens", 0) or 0
+    total = cc + cr + inp
+    if total == 0:
+        return 0
+    return round(cr / total * 100)
+
+
+# ─── Potential savings estimate ────────────────────────────────────────────────
+
+# Category-specific savings rates (research-backed: tool_hammering 40%, compaction_absence 30%, etc.)
+CATEGORY_SAVINGS_RATES = {
+    "tool_hammering":     0.40,
+    "tool_pollution":     0.35,
+    "compaction_absence": 0.30,
+    "cache_inefficiency": 0.25,
+    "context_bloat":      0.20,
+    "parallel_sprawl":    0.20,
+    "interruption_loops": 0.15,
+    "thinking_waste":     0.15,
+}
+
+def estimate_savings(sessions, scores_by_session):
+    """Category-specific savings rates applied per-session based on dominant waste category."""
+    savings = 0.0
+    for s in sessions:
+        sid = s.get("session_id", "")
+        scr = scores_by_session.get(sid, {})
+        if scr.get("total_score", 0) <= 30:
+            continue
+        cost = s.get("estimated_cost", 0) or 0
+        scores = scr.get("scores", {})
+        # Use the highest applicable rate from categories scoring > 30
+        rate = max(
+            (CATEGORY_SAVINGS_RATES.get(cat, 0.15) for cat, v in scores.items() if v > 30),
+            default=0.15,
+        )
+        savings += cost * rate
+    return round(savings, 2)
+
+
+# ─── Spec builder ─────────────────────────────────────────────────────────────
+
+def build_spec(
+    args,
+    all_projects,
+    all_sessions_flat,
+    sessions_by_project,
+    scores_by_session,
+    sprawl_by_project,
+    thresholds,
+    project_by_session,
+):
+    """Assemble the full JSON spec dict that the dashboard generator reads."""
+
+    total_cost    = round(sum((s.get("estimated_cost", 0) or 0) for s in all_sessions_flat), 2)
+    total_sessions = len(all_sessions_flat)
+
+    potential_savings = estimate_savings(all_sessions_flat, scores_by_session)
+
+    # ── Waste category totals (sum of per-session scores) ──────────────────────
+    cat_totals = {c: 0 for c in WASTE_CATEGORIES}
+    for scr in scores_by_session.values():
+        for c, v in scr["scores"].items():
+            cat_totals[c] += v
+    # Add project-level parallel sprawl contribution
+    for slug, sprawl in sprawl_by_project.items():
+        if sprawl >= 3:
+            cat_totals["parallel_sprawl"] += min(100, sprawl * 25)
+
+    top_waste_cat = (
+        max(cat_totals, key=cat_totals.get)
+        if any(cat_totals.values())
+        else "tool_hammering"
+    )
+
+    # ── Projects (top_n only) ─────────────────────────────────────────────────
+    projects_out = []
+    for p in all_projects[: args.top_n]:
+        slug     = p.get("slug", "")
+        sessions = sessions_by_project.get(slug, [])
+        duration_total = sum((s.get("duration_minutes", 0) or 0) for s in sessions)
+
+        # Aggregate waste scores per project: weighted mean by session cost (+ max for "worst case")
+        agg_scores    = {c: 0 for c in WASTE_CATEGORIES}
+        agg_max       = {c: 0 for c in WASTE_CATEGORIES}
+        agg_flags     = {c: [] for c in WASTE_CATEGORIES}
+        cost_sum      = sum((scores_by_session.get(s.get("session_id",""),{}).get("total_score",0) > 0)
+                            * (s.get("estimated_cost",0) or 0) for s in sessions)
+        for s in sessions:
+            sid  = s.get("session_id", "")
+            scr  = scores_by_session.get(sid, {})
+            cost = s.get("estimated_cost", 0) or 0
+            w    = cost / cost_sum if cost_sum > 0 else (1 / len(sessions) if sessions else 0)
+            for c in WASTE_CATEGORIES:
+                val = scr.get("scores", {}).get(c, 0)
+                agg_scores[c] += val * w
+                if val > agg_max[c]:
+                    agg_max[c] = val
+                agg_flags[c].extend(scr.get("flags", {}).get(c, []))
+        # Round weighted means to ints; clamp to [0,100]
+        agg_scores = {c: min(100, int(round(v))) for c, v in agg_scores.items()}
+
+        sprawl = sprawl_by_project.get(slug, 0)
+        if sprawl >= 3:
+            agg_scores["parallel_sprawl"] = min(100, sprawl * 25)
+            agg_flags["parallel_sprawl"].append(f"Up to {sprawl} concurrent sessions detected")
+
+        # Deduplicate flags, keep at most 3 per category
+        for c in WASTE_CATEGORIES:
+            seen, deduped = set(), []
+            for f in agg_flags[c]:
+                if f not in seen:
+                    seen.add(f)
+                    deduped.append(f)
+            agg_flags[c] = deduped[:3]
+
+        projects_out.append({
+            "slug":                   slug,
+            "display_name":           p.get("display_name", slug),
+            "estimated_cost":         round(p.get("estimated_cost", 0) or 0, 2),
+            "session_count":          p.get("session_count") or len(sessions),
+            "total_duration_minutes": round(duration_total, 1),
+            "parallel_sprawl_score":  min(100, sprawl * 25) if sprawl >= 3 else 0,
+            "waste_scores":           agg_scores,
+            "waste_scores_max":       agg_max,
+            "waste_flags":            {c: v for c, v in agg_flags.items() if v},
+        })
+
+    projects_out.sort(key=lambda x: x.get("estimated_cost", 0), reverse=True)
+
+    # ── Sessions: per top-N project, top sessions_per_project outliers by cost×waste ─
+    selected: list = []
+    seen_ids: set[str] = set()
+
+    def _session_priority(s):
+        sid = s.get("session_id", "")
+        scr = scores_by_session.get(sid, {})
+        cost = s.get("estimated_cost", 0) or 0
+        ws = scr.get("total_score", 0)
+        return cost * (1.0 + ws / 100.0)
+
+    for p in all_projects[: args.top_n]:
+        slug = p.get("slug", "")
+        sessions = sessions_by_project.get(slug, [])
+        sess_sorted = sorted(sessions, key=_session_priority, reverse=True)
+        for s in sess_sorted[: args.sessions_per_project]:
+            sid = s.get("session_id", "")
+            if sid and sid not in seen_ids:
+                seen_ids.add(sid)
+                selected.append(s)
+
+    if len(selected) < 10:
+        for s in sorted(
+            all_sessions_flat,
+            key=lambda x: x.get("estimated_cost", 0) or 0,
+            reverse=True,
+        ):
+            sid = s.get("session_id", "")
+            if sid and sid not in seen_ids:
+                seen_ids.add(sid)
+                selected.append(s)
+            if len(selected) >= 50:
+                break
+
+    sorted_sessions = selected[:50]
+
+    replay_ids = [s.get("session_id") for s in sorted_sessions if s.get("session_id")]
+    print(
+        f"  [replay] Fetching replay for {len(replay_ids)} sessions (parallel, max 8 workers)...",
+        flush=True,
+    )
+    replay_by_id = fetch_replays_parallel(replay_ids, max_workers=8)
+
+    sessions_out = []
+    for s in sorted_sessions:
+        sid  = s.get("session_id", "")
+        scr  = scores_by_session.get(sid, {})
+        active_cats = scr.get("active_categories", [])
+        top_waste   = active_cats[0][0] if active_cats else None
+
+        tool_counts = s.get("tool_counts", {}) or {}
+        top_tools   = dict(sorted(tool_counts.items(), key=lambda x: -x[1])[:5])
+
+        proj      = project_by_session.get(sid, {})
+        proj_slug = proj.get("slug", s.get("project_path", ""))
+        proj_name = proj.get("display_name", proj_slug)
+
+        cc = s.get("cache_creation_input_tokens", 0) or 0
+        cr = s.get("cache_read_input_tokens", 0) or 0
+        reuse_ratio = round(cr / cc, 2) if cc > 50_000 else round(cr / cc, 2) if cc > 0 else None
+
+        raw_replay = replay_by_id.get(sid)
+        rm = metrics_from_replay(raw_replay)
+        ev_out = copy.deepcopy(scr.get("evidence", {}))
+        rep = rm.get("repeat_recommendation") or ""
+        if rep:
+            for cat in ("tool_hammering", "tool_pollution"):
+                if cat in ev_out:
+                    ev_out[cat] = dict(ev_out[cat])
+                    ev_out[cat]["recommendation"] = rep
+
+        task_label = (
+            (rm.get("first_user_message") or "").strip()
+            or (s.get("first_user_message") or s.get("title") or s.get("session_title") or "")
+        )[:120]
+
+        sessions_out.append({
+            "session_id":         sid,
+            "project_slug":       proj_slug,
+            "project_name":       proj_name,
+            "start_time":         s.get("start_time"),
+            "estimated_cost":     round(s.get("estimated_cost", 0) or 0, 2),
+            "duration_minutes":   round(s.get("duration_minutes", 0) or 0, 1),
+            "cache_hit_rate_pct": cache_hit_rate_pct(s),
+            "cache_reuse_ratio":  reuse_ratio,
+            "total_tools":        sum(tool_counts.values()),
+            "tool_breakdown":     top_tools,
+            "has_compaction":     bool(s.get("has_compaction", False)),
+            "has_thinking":       bool(s.get("has_thinking", False)),
+            "first_user_message": task_label,
+            "repeat_read_ratio_pct": rm.get("repeat_read_ratio_pct"),
+            "sequential_tool_pct": rm.get("sequential_tool_pct"),
+            "per_turn_cache_hit_pct": rm.get("per_turn_cache_hit_pct") or [],
+            "waste_score":        scr.get("total_score", 0),
+            "top_waste":          top_waste,
+            "waste_scores":       scr.get("scores", {c: 0 for c in WASTE_CATEGORIES}),
+            "waste_evidence":     ev_out,
+            "replay":             raw_replay,
+        })
+
+    # ── Heatmap (all sessions, not just top 50) ────────────────────────────────
+    heatmap = build_heatmap(all_sessions_flat)
+
+    # ── Time series (all sessions aggregated by day) ───────────────────────────
+    time_series = build_time_series(all_sessions_flat, scores_by_session, project_by_session)
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    summary = {
+        "total_cost":         total_cost,
+        "total_sessions":     total_sessions,
+        "project_count":      len(all_projects),
+        "potential_savings":  potential_savings,
+        "top_waste_category": top_waste_cat,
+        "top_waste_label":    CATEGORY_LABELS[top_waste_cat],
+        "top_waste_color":    CATEGORY_COLORS[top_waste_cat],
+    }
+
+    projects_donut = sorted(
+        [
+            {
+                "label": p.get("display_name", p.get("slug", "?")),
+                "cost":  round(p.get("estimated_cost", 0) or 0, 2),
+            }
+            for p in all_projects
+        ],
+        key=lambda x: x["cost"],
+        reverse=True,
+    )
+
+    return {
+        "generated_at":          datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "params":                {
+            "top_n": args.top_n,
+            "sort_by": args.sort_by,
+            "sessions_per_project": args.sessions_per_project,
+        },
+        "summary":               summary,
+        "waste_category_totals": {c: v for c, v in cat_totals.items() if v > 0},
+        "projects":              projects_out,
+        "projects_donut":        projects_donut,
+        "sessions":              sessions_out,
+        "heatmap":               heatmap,
+        "time_series":           time_series,
+        "thresholds": {
+            "max_tool_p75":       round(thresholds["max_tool_p75"], 1),
+            "max_tool_p95":       round(thresholds["max_tool_p95"], 1),
+            "cache_ratio_p10":    round(thresholds["cache_ratio_p10"], 2),
+            "cache_ratio_p25":    round(thresholds["cache_ratio_p25"], 2),
+            "cache_ratio_median": round(thresholds["cache_ratio_median"], 2),
+        },
+    }
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+def run(args):
+    global BASE_URL
+    BASE_URL = resolve_cc_lens_base_url()
+    print(f"[cc-lens] API base: {BASE_URL}", flush=True)
+
+    # ── 1. Fetch projects ──────────────────────────────────────────────────────
+    print("[cc-lens] Fetching projects...", flush=True)
+    projects_data = api_get("/api/projects")
+    if not projects_data:
+        print(
+            f"[ERROR] Cannot reach cc-lens at {BASE_URL} — is it running? "
+            "Set CC_LENS_BASE_URL if the dashboard uses another port.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    all_projects = (
+        projects_data.get("projects", projects_data)
+        if isinstance(projects_data, dict)
+        else projects_data
+    )
+    if not isinstance(all_projects, list):
+        print("[ERROR] Unexpected projects response format")
+        sys.exit(1)
+
+    # Optional project filter
+    if args.project:
+        all_projects = [
+            p for p in all_projects
+            if args.project in p.get("slug", "")
+            or args.project.lower() in (p.get("display_name", "") or "").lower()
+        ]
+
+    sort_key = "estimated_cost" if args.sort_by == "cost" else "output_tokens"
+    all_projects.sort(key=lambda p: p.get(sort_key, 0) or 0, reverse=True)
+    print(f"[cc-lens] Found {len(all_projects)} projects", flush=True)
+
+    # ── 2. Fetch sessions ──────────────────────────────────────────────────────
+    print("[cc-lens] Fetching sessions (may take up to 60s)...", flush=True)
+    sessions_data = api_get("/api/sessions", timeout=60)
+    all_sessions_raw = (
+        sessions_data.get("sessions", sessions_data)
+        if isinstance(sessions_data, dict)
+        else sessions_data or []
+    )
+    print(f"[cc-lens] Got {len(all_sessions_raw)} sessions total", flush=True)
+
+    # Optional single-session filter
+    if args.session:
+        match = next(
+            (s for s in all_sessions_raw if s.get("session_id", "").startswith(args.session)),
+            None,
+        )
+        if match:
+            all_sessions_raw = [match]
+            proj = next(
+                (p for p in all_projects if p.get("project_path") == match.get("project_path")),
+                None,
+            )
+            all_projects = [proj] if proj else [
+                {"slug": "unknown", "display_name": "unknown", "estimated_cost": 0}
+            ]
+        else:
+            print(f"[WARN] Session {args.session!r} not found in dataset", flush=True)
+
+    # ── 3. Index sessions by project slug ─────────────────────────────────────
+    sessions_by_project = defaultdict(list)
+    project_by_session  = {}
+    for s in all_sessions_raw:
+        proj = next(
+            (p for p in all_projects if p.get("project_path") == s.get("project_path")),
+            None,
+        )
+        if proj:
+            slug = proj["slug"]
+            sessions_by_project[slug].append(s)
+            project_by_session[s.get("session_id", "")] = proj
+
+    all_sessions_flat = [s for ss in sessions_by_project.values() for s in ss]
+    print(f"[cc-lens] {len(all_sessions_flat)} sessions matched to projects", flush=True)
+
+    # ── 4. Compute percentile thresholds ──────────────────────────────────────
+    print(
+        f"[cc-lens] Computing percentile thresholds from {len(all_sessions_flat)} sessions...",
+        flush=True,
+    )
+    thresholds = compute_thresholds(all_sessions_flat)
+    print(
+        f"  max_tool  p75={thresholds['max_tool_p75']:.0f}  "
+        f"p95={thresholds['max_tool_p95']:.0f}  |  "
+        f"cache_ratio  p10={thresholds['cache_ratio_p10']:.1f}  "
+        f"median={thresholds['cache_ratio_median']:.1f}",
+        flush=True,
+    )
+
+    # ── 5. Score sessions ──────────────────────────────────────────────────────
+    print(f"[cc-lens] Scoring {len(all_sessions_flat)} sessions...", flush=True)
+    scores_by_session = {
+        s.get("session_id", ""): score_session(s, thresholds)
+        for s in all_sessions_flat
+    }
+
+    # ── 6. Detect parallel sprawl ──────────────────────────────────────────────
+    sprawl_by_project = detect_parallel_sprawl(sessions_by_project)
+
+    # ── 7. Build spec (includes replay fetches for top 3) ─────────────────────
+    print("[cc-lens] Building spec (fetching replay for selected sessions)...", flush=True)
+    spec = build_spec(
+        args,
+        all_projects,
+        all_sessions_flat,
+        sessions_by_project,
+        scores_by_session,
+        sprawl_by_project,
+        thresholds,
+        project_by_session,
+    )
+
+    # ── 8. Write spec file ────────────────────────────────────────────────────
+    output_path = args.output or "/tmp/cc-lens-spec.json"
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(spec, f, indent=2, default=str)
+    print(f"[cc-lens] Spec written to: {output_path}", flush=True)
+
+    # ── 9. Console summary ────────────────────────────────────────────────────
+    summary    = spec["summary"]
+    cat_totals = spec["waste_category_totals"]
+    top3_waste = sorted(cat_totals.items(), key=lambda x: -x[1])[:3]
+
+    print(f"\n{'=' * 60}")
+    print("cc-lens Analysis Summary")
+    print(f"{'=' * 60}")
+    print(f"Total cost analyzed:  ${summary['total_cost']:.2f}")
+    print(f"Total sessions:       {summary['total_sessions']}")
+    print(f"Projects:             {summary['project_count']}")
+    print(f"Potential savings:    ${summary['potential_savings']:.2f}")
+    print()
+    print("Top 3 waste categories:")
+    for i, (cat, total) in enumerate(top3_waste, 1):
+        label = CATEGORY_LABELS.get(cat, cat)
+        fix   = CATEGORY_FIXES.get(cat, "")[:60]
+        print(f"  {i}. {label}: score_sum={total}  — {fix}...")
+    print(f"{'=' * 60}\n")
+
+    return output_path
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="cc-lens token forensics analyzer — generates JSON spec for the dashboard"
+    )
+    parser.add_argument(
+        "--top-n", type=int, default=5,
+        help="Top N projects to emphasize in params (default: 5)",
+    )
+    parser.add_argument(
+        "--sort-by", choices=["cost", "tokens"], default="cost",
+        help="Primary sort metric (default: cost)",
+    )
+    parser.add_argument(
+        "--project", type=str, default=None,
+        help="Filter to a specific project by slug or name substring",
+    )
+    parser.add_argument(
+        "--session", type=str, default=None,
+        help="Analyze a single session by ID prefix",
+    )
+    parser.add_argument(
+        "--output", type=str, default="/tmp/cc-lens-spec.json",
+        help="Output path for the JSON spec (default: /tmp/cc-lens-spec.json)",
+    )
+    parser.add_argument(
+        "--sessions-per-project", type=int, default=3,
+        help="Top outlier sessions to include per project (default: 3)",
+    )
+    args = parser.parse_args()
+    run(args)
+
+
+if __name__ == "__main__":
+    main()
