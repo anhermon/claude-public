@@ -534,6 +534,17 @@ def generate_html(spec: dict) -> str:
     </div>
   </div>
 
+  <!-- Donut: cost % by project (B-5) -->
+  <div class="chart-row single">
+    <div class="chart-card">
+      <h3>Cost Distribution by Project</h3>
+      <div style="display:flex;align-items:center;gap:28px;flex-wrap:wrap">
+        <div style="width:240px;height:240px;flex-shrink:0"><canvas id="chartDonut"></canvas></div>
+        <div id="donutLegend" style="font-size:13px;line-height:2.1"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Heatmap -->
   <div class="chart-card" style="margin-bottom:20px">
     <h3>Session Activity Heatmap</h3>
@@ -603,6 +614,12 @@ def generate_html(spec: dict) -> str:
       </tbody>
     </table>
   </div>
+
+  <!-- Per-project cards (B-6 + T-6 sparklines) -->
+  <div style="margin:20px 0 10px">
+    <h2 style="font-size:0.85rem;font-family:system-ui,sans-serif;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin:0 0 10px">Project Deep Dive</h2>
+  </div>
+  <div id="projectCards"></div>
 
 </div><!-- /main-view -->
 
@@ -756,7 +773,7 @@ Chart.defaults.animation = false;
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 (function() {{
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];  // B-7: matches Python weekday() 0=Mon
   const hours = Array.from({{length:24}}, (_,i) => String(i).padStart(2,'0'));
   const table = document.getElementById('heatmapTable');
 
@@ -824,6 +841,12 @@ document.addEventListener('DOMContentLoaded', () => filterSessions(7, document.q
   const counts = TIME_SERIES.map(d => d.sessions);
   const cacheRates = TIME_SERIES.map(d => d.avg_cache_hit_rate);
   const wasteScores = TIME_SERIES.map(d => d.avg_waste_score);
+  // T-7: regression/improvement point styling
+  const pointColors = TIME_SERIES.map(d =>
+    d.regression  ? 'rgba(239,68,68,0.95)' :
+    d.improvement ? 'rgba(34,197,94,0.95)' : 'rgba(99,102,241,0.6)'
+  );
+  const pointRadii = TIME_SERIES.map(d => (d.regression || d.improvement) ? 6 : 3);
 
   // Chart 0: Cost by project (stacked area)
   (function() {{
@@ -910,8 +933,14 @@ document.addEventListener('DOMContentLoaded', () => filterSessions(7, document.q
           type: 'bar',
           label: 'Daily cost ($)',
           data: costs,
-          backgroundColor: '#6366f177',
-          borderColor: '#6366f1',
+          backgroundColor: TIME_SERIES.map(d =>
+            d.regression  ? 'rgba(239,68,68,0.55)' :
+            d.improvement ? 'rgba(34,197,94,0.55)' : '#6366f177'
+          ),
+          borderColor: TIME_SERIES.map(d =>
+            d.regression  ? '#ef4444' :
+            d.improvement ? '#22c55e' : '#6366f1'
+          ),
           borderWidth: 1,
           yAxisID: 'yCost',
         }},
@@ -1353,6 +1382,106 @@ function buildDefaultFinding(cat, score, s) {{
     default:
       return `Waste category score: ${{score}}/100.`;
   }}
+}}
+
+// ── B-5: Donut chart — cost % by project ─────────────────────────────────────
+(function() {{
+  const canvas = document.getElementById('chartDonut');
+  if (!canvas) return;
+  const pb = PROJECTS_BAR;
+  const labels = pb.labels || [];
+  const costs  = (pb.datasets?.[0]?.data || []);
+  const total  = costs.reduce((a,b) => a+b, 0);
+  if (!total) return;
+  const colors = ['#6366f1','#f97316','#22c55e','#06b6d4','#ec4899','#8b5cf6','#f59e0b','#64748b','#14b8a6','#a855f7'];
+  new Chart(canvas.getContext('2d'), {{
+    type: 'doughnut',
+    data: {{ labels, datasets: [{{ data: costs, backgroundColor: colors, borderWidth: 2, borderColor: '#1e293b' }}] }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      plugins: {{
+        legend: {{ display: false }},
+        tooltip: {{ callbacks: {{ label: ctx => ` ${{ctx.label}}: ${{fmtCost(ctx.parsed)}} (${{(ctx.parsed/total*100).toFixed(1)}}%)` }} }}
+      }}
+    }}
+  }});
+  const leg = document.getElementById('donutLegend');
+  if (leg) labels.forEach((lbl,i) => {{
+    const pct = (costs[i]/total*100).toFixed(1);
+    leg.innerHTML += `<div style="display:flex;align-items:center;gap:7px"><span style="width:11px;height:11px;border-radius:2px;background:${{colors[i%colors.length]}};flex-shrink:0"></span><span><strong>${{escHtml(lbl)}}</strong> — ${{fmtCost(costs[i])}} (${{pct}}%)</span></div>`;
+  }});
+}})();
+
+// ── B-6 + T-6: Per-project cards with 14-day sparklines ──────────────────────
+(function() {{
+  const container = document.getElementById('projectCards');
+  if (!container) return;
+  const byProject = {{}};
+  SESSIONS.forEach(s => {{
+    const slug = s.project_slug || 'unknown';
+    if (!byProject[slug]) byProject[slug] = {{ slug, name: SLUG_TO_DISPLAY[slug] || slug, sessions: [], cost: 0 }};
+    byProject[slug].sessions.push(s);
+    byProject[slug].cost += s.cost || 0;
+  }});
+  const projects = Object.values(byProject).sort((a,b) => b.cost - a.cost).slice(0,10);
+  projects.forEach((proj, pi) => {{
+    const topSessions = [...proj.sessions].sort((a,b) => (b.cost||0)-(a.cost||0)).slice(0,3);
+    const avgWaste = proj.sessions.length ? Math.round(proj.sessions.reduce((a,s)=>a+(s.waste||0),0)/proj.sessions.length) : 0;
+    const topCat = proj.sessions.reduce((acc,s) => {{ if(s.top_waste) acc[s.top_waste]=(acc[s.top_waste]||0)+1; return acc; }}, {{}});
+    const topCatKey = Object.keys(topCat).sort((a,b)=>topCat[b]-topCat[a])[0];
+    const catColor = WASTE_COLORS[topCatKey] || '#6366f1';
+    const catLabel = WASTE_LABELS[topCatKey] || topCatKey || '—';
+    // T-6: 14-day sparkline from TIME_SERIES
+    const last14 = TIME_SERIES.slice(-14);
+    const sparkVals = last14.map(d => d.by_project?.[proj.slug] || 0);
+    const sparkMax = Math.max(...sparkVals, 0.01);
+    const W=80, H=24;
+    const pts = sparkVals.map((v,i) => {{
+      const x = (i/(sparkVals.length-1||1))*W;
+      const y = H - (v/sparkMax)*(H-3) - 1;
+      return x.toFixed(1)+','+y.toFixed(1);
+    }}).join(' ');
+    const sparkSvg = sparkVals.some(v=>v>0)
+      ? `<svg width="${{W}}" height="${{H}}" viewBox="0 0 ${{W}} ${{H}}" style="vertical-align:middle;margin-left:10px;opacity:0.8"><polyline points="${{pts}}" fill="none" stroke="#6366f1" stroke-width="1.5" stroke-linejoin="round"/></svg>`
+      : '';
+    const id = `pc-${{pi}}`;
+    const card = document.createElement('div');
+    card.className = 'table-card';
+    card.style.cssText = 'margin-bottom:10px;padding:14px 18px';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;cursor:pointer" onclick="toggleCard('${{id}}')">
+        <div style="flex:1;display:flex;align-items:center">
+          <span style="font-family:system-ui;font-weight:600;font-size:0.92rem">${{escHtml(proj.name)}}</span>
+          <span style="margin-left:6px;font-size:0.78rem;color:var(--text-muted)">${{proj.sessions.length}} sessions</span>
+          ${{sparkSvg}}
+        </div>
+        <span style="font-size:1rem;font-weight:700;color:var(--accent)">${{fmtCost(proj.cost)}}</span>
+        <span style="font-size:0.78rem;padding:2px 8px;border-radius:10px;background:${{catColor}}22;color:${{catColor}};white-space:nowrap">${{catLabel}}</span>
+        <span style="font-size:0.78rem;color:var(--text-muted)">avg waste ${{avgWaste}}</span>
+        <span style="color:var(--text-muted);font-size:0.78rem" id="${{id}}-ch">▼</span>
+      </div>
+      <div id="${{id}}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+        ${{topSessions.map(s => `
+          <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer"
+               onclick="openDrilldown(event,'${{s.session_id}}')">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-family:monospace">${{s.session_id.slice(0,8)}}</span>
+            <span style="font-size:0.78rem;color:var(--text-muted)">${{s.date||''}}</span>
+            <span style="flex:1"></span>
+            <span style="font-size:0.85rem;font-weight:600;color:var(--accent)">${{fmtCost(s.cost||0)}}</span>
+            <span style="font-size:0.75rem;padding:1px 6px;border-radius:8px;background:${{WASTE_COLORS[s.top_waste]||'#6366f1'}}22;color:${{WASTE_COLORS[s.top_waste]||'#6366f1'}}">${{WASTE_LABELS[s.top_waste]||s.top_waste||'—'}}</span>
+          </div>`).join('')}}
+      </div>`;
+    container.appendChild(card);
+  }});
+}})();
+
+function toggleCard(id) {{
+  const el = document.getElementById(id);
+  const ch = document.getElementById(id+'-ch');
+  if (!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : 'block';
+  if (ch) ch.textContent = open ? '▼' : '▲';
 }}
 
 function escHtml(str) {{

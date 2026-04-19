@@ -328,12 +328,14 @@ def score_session(s, thresholds):
         reuse_ratio = cache_read / cache_create
 
     # ── 3. CONTEXT BLOAT ──────────────────────────────────────────────────────
-    # Only meaningful when cache_creation is above the median (~201K).
-    # Driven by the combination of low cache reuse AND a large context window.
+    # Two independent signals:
+    #   (a) large context + low cache reuse (requires substantial cache creation)
+    #   (b) long session without /compact (independent of cache size — B-8 fix)
+    cb_score = 0
+
+    # Signal (a): large context + low reuse
     if cache_create > t["cache_create_p50"]:
         ci_score = scores["cache_inefficiency"]
-        cb_score = 0
-
         if ci_score > 50 and cache_create > t["cache_create_p75"]:
             cb_score = int(ci_score * 0.8)
             flags["context_bloat"].append(
@@ -348,21 +350,22 @@ def score_session(s, thresholds):
                 "recommendation": CATEGORY_RECOMMENDATIONS["context_bloat"],
             }
 
-        # Long session without compaction also signals context bloat
-        if duration > 120 and not has_compaction:
-            cb_score = max(cb_score, 40)
-            flags["context_bloat"].append(
-                f"{duration:.0f} min session with large context and no /compact"
-            )
-            if "context_bloat" not in evidence:
-                evidence["context_bloat"] = {
-                    "finding": (
-                        f"{duration:.0f} min session with "
-                        f"{cache_create // 1_000}K token context and no compaction"
-                    ),
-                    "recommendation": CATEGORY_RECOMMENDATIONS["context_bloat"],
-                }
+    # Signal (b): long session without /compact (fires regardless of cache size)
+    if duration > 120 and not has_compaction:
+        cb_score = max(cb_score, 40)
+        flags["context_bloat"].append(
+            f"{duration:.0f} min session with no /compact"
+        )
+        if "context_bloat" not in evidence:
+            evidence["context_bloat"] = {
+                "finding": (
+                    f"{duration:.0f} min session with "
+                    f"{cache_create // 1_000}K token context and no compaction"
+                ),
+                "recommendation": CATEGORY_RECOMMENDATIONS["context_bloat"],
+            }
 
+    if cb_score > 0:
         scores["context_bloat"] = min(100, cb_score)
 
     # ── 4. COMPACTION ABSENCE ─────────────────────────────────────────────────
@@ -565,6 +568,20 @@ def build_time_series(all_sessions_flat, scores_by_session, project_by_session=N
             "by_project":         {k: round(v, 2) for k, v in d["by_project"].items()},
             "by_waste":           {k: round(v, 1) for k, v in d["by_waste"].items()},
         })
+
+    # T-7: annotate each day with regression/improvement vs 7-day rolling prior average
+    for i, day in enumerate(result):
+        window = result[max(0, i - 7):i]
+        if len(window) >= 3:
+            avg_cost  = sum(d["cost"] for d in window) / len(window)
+            avg_waste = sum(d["avg_waste_score"] for d in window) / len(window)
+            cost_pct  = (day["cost"] - avg_cost) / avg_cost * 100 if avg_cost > 0 else 0
+            waste_pct = (day["avg_waste_score"] - avg_waste) / avg_waste * 100 if avg_waste > 0 else 0
+            day["regression"]       = "cost" if cost_pct > 20 else ("waste" if waste_pct > 20 else None)
+            day["improvement"]      = "cost" if cost_pct < -20 else ("waste" if waste_pct < -20 else None)
+            day["cost_vs_avg_pct"]  = round(cost_pct, 1)
+            day["waste_vs_avg_pct"] = round(waste_pct, 1)
+
     return result
 
 
@@ -607,17 +624,33 @@ def cache_hit_rate_pct(s):
 
 # ─── Potential savings estimate ────────────────────────────────────────────────
 
+# Category-specific savings rates (research-backed: tool_hammering 40%, compaction_absence 30%, etc.)
+CATEGORY_SAVINGS_RATES = {
+    "tool_hammering":     0.40,
+    "compaction_absence": 0.30,
+    "cache_inefficiency": 0.25,
+    "context_bloat":      0.20,
+    "parallel_sprawl":    0.20,
+    "interruption_loops": 0.15,
+    "thinking_waste":     0.15,
+}
+
 def estimate_savings(sessions, scores_by_session):
-    """
-    Rough estimate: sessions with waste_score > 50 could save ~20% of their
-    cost if the top recommendations were applied.
-    """
+    """Category-specific savings rates applied per-session based on dominant waste category."""
     savings = 0.0
     for s in sessions:
         sid = s.get("session_id", "")
         scr = scores_by_session.get(sid, {})
-        if scr.get("total_score", 0) > 50:
-            savings += (s.get("estimated_cost", 0) or 0) * 0.20
+        if scr.get("total_score", 0) <= 30:
+            continue
+        cost = s.get("estimated_cost", 0) or 0
+        scores = scr.get("scores", {})
+        # Use the highest applicable rate from categories scoring > 30
+        rate = max(
+            (CATEGORY_SAVINGS_RATES.get(cat, 0.15) for cat, v in scores.items() if v > 30),
+            default=0.15,
+        )
+        savings += cost * rate
     return round(savings, 2)
 
 
@@ -663,17 +696,25 @@ def build_spec(
         sessions = sessions_by_project.get(slug, [])
         duration_total = sum((s.get("duration_minutes", 0) or 0) for s in sessions)
 
-        # Aggregate waste scores per project: take the maximum across all sessions
-        agg_scores = {c: 0 for c in WASTE_CATEGORIES}
-        agg_flags  = {c: [] for c in WASTE_CATEGORIES}
+        # Aggregate waste scores per project: weighted mean by session cost (+ max for "worst case")
+        agg_scores    = {c: 0 for c in WASTE_CATEGORIES}
+        agg_max       = {c: 0 for c in WASTE_CATEGORIES}
+        agg_flags     = {c: [] for c in WASTE_CATEGORIES}
+        cost_sum      = sum((scores_by_session.get(s.get("session_id",""),{}).get("total_score",0) > 0)
+                            * (s.get("estimated_cost",0) or 0) for s in sessions)
         for s in sessions:
-            sid = s.get("session_id", "")
-            scr = scores_by_session.get(sid, {})
+            sid  = s.get("session_id", "")
+            scr  = scores_by_session.get(sid, {})
+            cost = s.get("estimated_cost", 0) or 0
+            w    = cost / cost_sum if cost_sum > 0 else (1 / len(sessions) if sessions else 0)
             for c in WASTE_CATEGORIES:
                 val = scr.get("scores", {}).get(c, 0)
-                if val > agg_scores[c]:
-                    agg_scores[c] = val
+                agg_scores[c] += val * w
+                if val > agg_max[c]:
+                    agg_max[c] = val
                 agg_flags[c].extend(scr.get("flags", {}).get(c, []))
+        # Round weighted means to ints; clamp to [0,100]
+        agg_scores = {c: min(100, int(round(v))) for c, v in agg_scores.items()}
 
         sprawl = sprawl_by_project.get(slug, 0)
         if sprawl >= 3:
@@ -697,6 +738,7 @@ def build_spec(
             "total_duration_minutes": round(duration_total, 1),
             "parallel_sprawl_score":  min(100, sprawl * 25) if sprawl >= 3 else 0,
             "waste_scores":           agg_scores,
+            "waste_scores_max":       agg_max,
             "waste_flags":            {c: v for c, v in agg_flags.items() if v},
         })
 
@@ -961,6 +1003,10 @@ def main():
     parser.add_argument(
         "--output", type=str, default="/tmp/cc-lens-spec.json",
         help="Output path for the JSON spec (default: /tmp/cc-lens-spec.json)",
+    )
+    parser.add_argument(
+        "--sessions-per-project", type=int, default=3,
+        help="Top outlier sessions to include per project (default: 3)",
     )
     args = parser.parse_args()
     run(args)

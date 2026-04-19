@@ -78,22 +78,25 @@ All API calls go to `http://localhost:3001/api/...`. If the dashboard is not run
 
 ### Steps
 
-1. **Run the analysis script:**
+1. **Run the analysis script** (writes JSON spec):
    ```bash
    python3 ~/.claude/skills/cc-lens/scripts/analyze.py \
      --top-n 5 \
      --sort-by cost \
      --sessions-per-project 3 \
-     --output /tmp/cc-lens-report.html
+     --output /tmp/cc-lens-spec.json
    ```
-   Adjust `--top-n` and `--sort-by` from user request.
+   Adjust `--top-n`, `--sort-by`, `--sessions-per-project` from user request.
 
-2. **Open the report:**
+2. **Generate the HTML dashboard** from the spec:
    ```bash
+   python3 ~/.claude/skills/cc-lens/scripts/generate_dashboard.py \
+     --spec /tmp/cc-lens-spec.json \
+     --output /tmp/cc-lens-report.html
    open /tmp/cc-lens-report.html
    ```
 
-3. **Summarize key findings** from the script's stdout (printed before generating HTML):
+3. **Summarize key findings** from step 1's stdout:
    - Top 3 waste categories found across all analyzed projects
    - Single most actionable recommendation
    - Total potential cost savings if recommendations are applied
@@ -116,12 +119,17 @@ All API calls go to `http://localhost:3001/api/...`. If the dashboard is not run
    " | head -20
    ```
 
-2. **Run analysis for just that project:**
+2. **Run analysis for just that project** (two-step pipeline):
    ```bash
    python3 ~/.claude/skills/cc-lens/scripts/analyze.py \
      --project SLUG \
      --sessions-per-project 10 \
+     --output /tmp/cc-lens-project-SLUG.json
+
+   python3 ~/.claude/skills/cc-lens/scripts/generate_dashboard.py \
+     --spec /tmp/cc-lens-project-SLUG.json \
      --output /tmp/cc-lens-project-SLUG.html
+   open /tmp/cc-lens-project-SLUG.html
    ```
 
 3. **Open and summarize.**
@@ -148,11 +156,16 @@ All API calls go to `http://localhost:3001/api/...`. If the dashboard is not run
    "
    ```
 
-2. **Run deep forensics:**
+2. **Run deep forensics** (two-step pipeline):
    ```bash
    python3 ~/.claude/skills/cc-lens/scripts/analyze.py \
      --session SESSION_ID \
+     --output /tmp/cc-lens-session-SESSION_ID.json
+
+   python3 ~/.claude/skills/cc-lens/scripts/generate_dashboard.py \
+     --spec /tmp/cc-lens-session-SESSION_ID.json \
      --output /tmp/cc-lens-session-SESSION_ID.html
+   open /tmp/cc-lens-session-SESSION_ID.html
    ```
 
 3. **Open and summarize** the turn-by-turn waste findings.
