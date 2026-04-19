@@ -1,8 +1,0 @@
-{
-  "$schema": "https://claude.ai/plugin-schema/v1",
-  "name": "cc-lens",
-  "version": "1.1.0",
-  "description": "Token usage intelligence for Claude Code — analyze session costs, identify waste categories, generate forensics HTML reports with time-series charts and drill-down session inspection. Includes the token-efficiency-analyzer agent for holistic, evidence-backed recommendations via interactive selection.",
-  "author": { "name": "Angel Hermon", "email": "angel.hermon@dealhub.io" },
-  "keywords": ["tokens", "cost", "optimization", "forensics", "analytics", "cc-lens", "session-analysis"]
-}
