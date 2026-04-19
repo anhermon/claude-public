@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "context-os-cli"
+version = "2.1.0"
+description = "Bundled CLI for the context-os Claude Code plugin (graph, sessions, cc-lens, ingest)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Angel Hermon" }]
+keywords = ["claude", "context", "knowledge-graph", "cc-lens"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.scripts]
+context-os = "context_os.context_os_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["context_os*"]
