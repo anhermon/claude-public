@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CONTEXT_OS_PLUGIN_ROOT}/hooks/auto-ingest.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CONTEXT_OS_PLUGIN_ROOT}/hooks/session-end.py\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CONTEXT_OS_PLUGIN_ROOT}/hooks/session-start.py\""
+          }
+        ]
+      }
+    ]
+  }
+}
