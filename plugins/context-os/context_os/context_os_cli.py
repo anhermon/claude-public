@@ -492,6 +492,171 @@ def _render_filemap_section(fm: dict | None) -> str:
     return f'<section><h2>File-map bloat (last 30d)</h2>{cards_html}{table}</section>'
 
 
+def _render_audit_sections_for_lens(
+    *,
+    health: dict,
+    filemap_result: dict | None,
+    ccusage_clean: str,
+    ccusage_err: str,
+    cc_status: str,
+    graph_root: str,
+    gen_ts: str,
+) -> str:
+    """Render the audit-only sections (graph health, filemap, ccusage, etc.)
+    using cc-lens dashboard CSS classes so they look native when merged in.
+    """
+    # Graph health KPI row
+    kpi_cards = [
+        ("Total Nodes", health.get("total_nodes", 0), ""),
+        ("Orphans", health.get("orphan_count", 0), "color:var(--amber)" if (health.get("orphan_count") or 0) else ""),
+        ("Stale (60d)", health.get("stale_count", 0), "color:var(--amber)" if (health.get("stale_count") or 0) else ""),
+        ("Hubs", len(health.get("hubs", []) or []), ""),
+    ]
+    kpi_html = '<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">' + "".join(
+        f'<div class="kpi-card"><div class="kpi-label">{html.escape(lbl)}</div>'
+        f'<div class="kpi-value" style="{style}">{val}</div></div>'
+        for lbl, val, style in kpi_cards
+    ) + "</div>"
+
+    # Orphans / stale / hubs tables
+    def _list_table(title: str, items: list) -> str:
+        if not items:
+            return (
+                f'<div class="chart-card"><h3>{html.escape(title)}</h3>'
+                f'<p style="color:var(--text-muted);font-size:12px">None.</p></div>'
+            )
+        rows = []
+        for it in items[:50]:
+            if isinstance(it, dict):
+                rows.append(f'<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">{html.escape(str(it.get("path", it)))}</td></tr>')
+            else:
+                rows.append(f'<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">{html.escape(str(it))}</td></tr>')
+        more = f'<p style="color:var(--text-muted);font-size:11px;margin-top:6px">Showing first 50 of {len(items)}.</p>' if len(items) > 50 else ""
+        return (
+            f'<div class="chart-card"><h3>{html.escape(title)}</h3>'
+            f'<table style="width:100%;border-collapse:collapse"><tbody>{"".join(rows)}</tbody></table>{more}</div>'
+        )
+
+    orphans_html = _list_table(f"Orphans ({health.get('orphan_count', 0)})", health.get("orphans", []) or [])
+    stale_html   = _list_table(f"Stale nodes >60d ({health.get('stale_count', 0)})", health.get("stale", []) or [])
+    hubs_html    = _list_table(f"Hubs ({len(health.get('hubs', []) or [])})", health.get("hubs", []) or [])
+
+    # Status counts
+    status_counts = health.get("status_counts", {}) or {}
+    if status_counts:
+        rows = "".join(
+            f'<tr><td style="padding:4px 8px;border-bottom:1px solid var(--border)">{html.escape(k)}</td>'
+            f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace">{v}</td></tr>'
+            for k, v in sorted(status_counts.items())
+        )
+        status_html = (
+            f'<div class="chart-card"><h3>Status counts</h3>'
+            f'<table style="width:100%;border-collapse:collapse"><thead>'
+            f'<tr><th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Status</th>'
+            f'<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Count</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table></div>'
+        )
+    else:
+        status_html = '<div class="chart-card"><h3>Status counts</h3><p style="color:var(--text-muted);font-size:12px">No nodes ingested yet.</p></div>'
+
+    # File-map bloat
+    if not filemap_result:
+        filemap_html = (
+            '<div class="chart-card"><h3>File-map bloat (last 30d)</h3>'
+            '<p style="color:var(--text-muted);font-size:12px">cc-lens not reachable — run <code>context-os filemap</code> once cc-lens is up.</p></div>'
+        )
+    elif filemap_result.get("error"):
+        filemap_html = (
+            f'<div class="chart-card"><h3>File-map bloat (last 30d)</h3>'
+            f'<p style="color:var(--text-muted);font-size:12px">file_map error: {html.escape(str(filemap_result["error"]))}</p></div>'
+        )
+    else:
+        flagged = filemap_result.get("flagged", [])[:20]
+        fm_cards = [
+            ("Sessions Scanned", filemap_result.get("sessions_scanned", 0), ""),
+            ("Files Observed",   filemap_result.get("files_observed", 0), ""),
+            ("Bloat Candidates", filemap_result.get("bloat_candidates", 0), "color:var(--amber)" if filemap_result.get("bloat_candidates") else ""),
+        ]
+        fm_kpi = '<div class="kpi-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">' + "".join(
+            f'<div class="kpi-card"><div class="kpi-label">{html.escape(lbl)}</div>'
+            f'<div class="kpi-value" style="{style}">{val:,}</div></div>'
+            for lbl, val, style in fm_cards
+        ) + "</div>"
+        if flagged:
+            rows = []
+            for e in flagged:
+                rows.append(
+                    "<tr>"
+                    f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px;word-break:break-all">{html.escape(str(e.get("path","")))}</td>'
+                    f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">{e.get("read_count",0)}</td>'
+                    f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">{e.get("file_line_count",0)}</td>'
+                    f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-family:monospace;font-size:11px">{e.get("file_size_bytes",0):,}</td>'
+                    f'<td style="padding:4px 8px;border-bottom:1px solid var(--border);font-size:11px">{html.escape(str(e.get("suggestion") or ""))}</td>'
+                    "</tr>"
+                )
+            table = (
+                '<table style="width:100%;border-collapse:collapse">'
+                '<thead><tr>'
+                '<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Path</th>'
+                '<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Reads</th>'
+                '<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Lines</th>'
+                '<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Size (B)</th>'
+                '<th style="text-align:left;padding:4px 8px;color:var(--text-muted);font-weight:500">Suggestion</th>'
+                '</tr></thead>'
+                f'<tbody>{"".join(rows)}</tbody></table>'
+            )
+        else:
+            table = '<p style="color:var(--text-muted);font-size:12px">No bloat candidates detected.</p>'
+        filemap_html = f'<div class="chart-card"><h3>File-map bloat (last 30d)</h3>{fm_kpi}{table}</div>'
+
+    # ccusage
+    ccusage_pre = (
+        f'<pre style="background:#07090b;padding:12px;border-radius:8px;overflow:auto;'
+        f'font-size:11px;max-height:520px;color:var(--text)">'
+        f'{html.escape(ccusage_clean) or "<em>no output</em>"}</pre>'
+    )
+    if ccusage_err:
+        ccusage_pre += (
+            f'<details style="margin-top:8px"><summary style="cursor:pointer;color:var(--text-muted)">ccusage stderr</summary>'
+            f'<pre style="background:#07090b;padding:10px;border-radius:6px;overflow:auto;font-size:11px;color:var(--text)">{html.escape(ccusage_err)}</pre></details>'
+        )
+    ccusage_html = f'<div class="chart-card"><h3>ccusage (daily)</h3>{ccusage_pre}</div>'
+
+    # Audit-wide header banner
+    banner = (
+        '<div class="chart-card" style="margin-top:28px;border-top:2px solid var(--accent)">'
+        f'<h3 style="color:var(--accent)">context-os audit · {html.escape(gen_ts)}</h3>'
+        f'<div style="color:var(--text-muted);font-size:12px;margin-bottom:8px">'
+        f'graph: <code style="font-family:monospace">{graph_root}</code> &nbsp;·&nbsp; cc-lens: {html.escape(cc_status)}'
+        '</div>'
+        '<div style="color:var(--text-muted);font-size:12px">'
+        'Sections below: graph health, status, orphans, stale, hubs, file-map bloat, ccusage daily totals.'
+        '</div></div>'
+    )
+
+    return (
+        banner
+        + '<div class="chart-card" style="margin-top:16px"><h3>Graph health</h3>' + kpi_html + '</div>'
+        + '<div class="chart-row" style="margin-top:16px">' + status_html + filemap_html + '</div>'
+        + '<div class="chart-row" style="margin-top:16px">' + orphans_html + stale_html + '</div>'
+        + '<div class="chart-row single" style="margin-top:16px">' + hubs_html + '</div>'
+        + '<div class="chart-row single" style="margin-top:16px">' + ccusage_html + '</div>'
+    )
+
+
+def _merge_audit_into_lens(lens_html: str, audit_sections_html: str) -> str:
+    """Splice audit sections into the rich cc-lens dashboard just before
+    the main-view closing marker. Returns merged HTML string.
+    """
+    marker = '</div><!-- /main-view -->'
+    if marker in lens_html:
+        return lens_html.replace(marker, audit_sections_html + "\n" + marker, 1)
+    # Fallback: inject before </body>
+    if "</body>" in lens_html:
+        return lens_html.replace("</body>", audit_sections_html + "\n</body>", 1)
+    return lens_html + audit_sections_html
+
+
 def cmd_audit(args: argparse.Namespace) -> int:
     KG = _graph_module()
     g = KG(Path(args.graph))
@@ -639,7 +804,41 @@ def cmd_audit(args: argparse.Namespace) -> int:
     details { margin-top:8px; } details pre { background:#07090b; padding:10px; border-radius:6px; overflow:auto; font-size:11.5px; }
     """
 
-    page = f"""<!DOCTYPE html><html lang="en"><head>
+    # Build the merged bundle: if cc-lens analyze succeeded, splice the
+    # audit sections into the rich forensics dashboard. Otherwise, fall
+    # back to the standalone audit page.
+    bundle_ts = Path(f"/tmp/context-os-audit-bundle-{ts}.html")
+    bundle_ts.parent.mkdir(parents=True, exist_ok=True)
+
+    merged = False
+    page: str = ""
+    if analyze_ok:
+        try:
+            lens_raw = Path(lens_html_path).read_text(encoding="utf-8")
+            audit_sections = _render_audit_sections_for_lens(
+                health=health,
+                filemap_result=filemap_result,
+                ccusage_clean=ccusage_clean,
+                ccusage_err=ccusage_err,
+                cc_status=cc_status,
+                graph_root=graph_root,
+                gen_ts=gen_ts,
+            )
+            page = _merge_audit_into_lens(lens_raw, audit_sections)
+            # Retitle the merged page so it is recognizable as the audit bundle.
+            page = page.replace(
+                "<title>cc-lens Token Forensics</title>",
+                f"<title>context-os audit · {gen_ts}</title>",
+                1,
+            )
+            merged = True
+        except Exception as _merge_e:
+            analyze_err = (analyze_err + f" | merge failed: {_merge_e}").strip(" |")
+            merged = False
+
+    if not merged:
+        # Fallback standalone bundle (no rich dashboard available)
+        page = f"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8"><title>context-os audit — {gen_ts}</title>
 <style>{css}</style></head><body>
 <header>
@@ -658,8 +857,6 @@ def cmd_audit(args: argparse.Namespace) -> int:
 </main>
 </body></html>"""
 
-    bundle_ts = Path(f"/tmp/context-os-audit-bundle-{ts}.html")
-    bundle_ts.parent.mkdir(parents=True, exist_ok=True)
     bundle_ts.write_text(page, encoding="utf-8")
     for legacy_name in (
         Path("/tmp/context-os-audit-bundle-latest.html"),
@@ -682,6 +879,7 @@ def cmd_audit(args: argparse.Namespace) -> int:
                 "cc_lens_status": cc_status,
                 "cc_lens_started": cc_started,
                 "cc_lens_html": lens_html_path if analyze_ok else None,
+                "merged_dashboard": merged,
                 "filemap": {
                     "bloat_candidates": (filemap_result or {}).get("bloat_candidates"),
                     "files_observed":   (filemap_result or {}).get("files_observed"),
