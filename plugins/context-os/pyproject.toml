@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "context-os-cli"
-version = "2.1.0"
+version = "2.2.0"
 description = "Bundled CLI for the context-os Claude Code plugin (graph, sessions, cc-lens, ingest)."
 readme = "README.md"
 requires-python = ">=3.10"
