@@ -13,14 +13,28 @@ import argparse
 import copy
 import json
 import sys
+import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
+from pathlib import Path
 
-from context_os.cc_lens_url import resolve_cc_lens_base_url
+# Self-bootstrap: ensure the plugin root is on sys.path so `context_os.*` imports
+# resolve even when this script is launched directly (e.g. `python analyze.py`)
+# or via a subprocess that did not inherit PYTHONPATH.
+_PLUGIN_ROOT = Path(__file__).resolve().parent.parent
+if str(_PLUGIN_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PLUGIN_ROOT))
+
+from context_os.cc_lens_url import (  # noqa: E402
+    cc_lens_auth_hint,
+    resolve_cc_lens_auth,
+    resolve_cc_lens_base_url,
+)
 
 BASE_URL = "http://localhost:3001"
+_AUTH_FAILED = False  # set by api_get() on the first 401 so main() can exit cleanly
 
 # ─── Waste categories ──────────────────────────────────────────────────────────
 
@@ -83,11 +97,25 @@ CATEGORY_FIXES = {
 # ─── API helpers ───────────────────────────────────────────────────────────────
 
 def api_get(path, timeout=60):
-    """GET from the cc-lens API. Returns parsed JSON or None on failure."""
+    """GET from the cc-lens API. Returns parsed JSON or None on failure.
+
+    Sends auth headers from resolve_cc_lens_auth(). On 401, sets the module-level
+    _AUTH_FAILED flag so callers can produce a clean actionable error instead of
+    a stack trace.
+    """
+    global _AUTH_FAILED
     url = f"{BASE_URL}{path}"
+    req = urllib.request.Request(url, headers=resolve_cc_lens_auth())
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            _AUTH_FAILED = True
+            print(f"[ERROR] GET {path}: HTTP 401 Unauthorized", file=sys.stderr)
+        else:
+            print(f"[ERROR] GET {path}: HTTP {e.code} {e.reason}", file=sys.stderr)
+        return None
     except Exception as e:
         print(f"[ERROR] GET {path}: {e}", file=sys.stderr)
         return None
@@ -1089,11 +1117,14 @@ def run(args):
     print("[cc-lens] Fetching projects...", flush=True)
     projects_data = api_get("/api/projects")
     if not projects_data:
-        print(
-            f"[ERROR] Cannot reach cc-lens at {BASE_URL} — is it running? "
-            "Set CC_LENS_BASE_URL if the dashboard uses another port.",
-            file=sys.stderr,
-        )
+        if _AUTH_FAILED:
+            print(cc_lens_auth_hint(), file=sys.stderr)
+        else:
+            print(
+                f"[ERROR] Cannot reach cc-lens at {BASE_URL} — is it running? "
+                "Set CC_LENS_BASE_URL if the dashboard uses another port.",
+                file=sys.stderr,
+            )
         sys.exit(1)
 
     all_projects = (
