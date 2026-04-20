@@ -1,7 +1,7 @@
 {
   "$schema": "https://claude.ai/plugin-schema/v1",
   "name": "context-os",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Unified context suite for Claude Code: knowledge graph (quickstart, ingest, graph health), session analytics (cc-lens dashboard + ccusage), token-efficiency playbook, context audit (graph + waste), and three-mode ingest (auto via hooks, source URLs/Confluence stubs, historical sessions). /cc-lens command turns analysis into paste-prompts or per-project remediation. Bundled lightweight CLI — no external tastematter binary.",
   "author": { "name": "Angel Hermon", "email": "angel.hermon@dealhub.io" },
   "keywords": [

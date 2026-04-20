@@ -13,28 +13,14 @@ import argparse
 import copy
 import json
 import sys
-import urllib.error
 import urllib.request
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from pathlib import Path
 
-# Self-bootstrap: ensure the plugin root is on sys.path so `context_os.*` imports
-# resolve even when this script is launched directly (e.g. `python analyze.py`)
-# or via a subprocess that did not inherit PYTHONPATH.
-_PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-if str(_PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PLUGIN_ROOT))
-
-from context_os.cc_lens_url import (  # noqa: E402
-    cc_lens_auth_hint,
-    resolve_cc_lens_auth,
-    resolve_cc_lens_base_url,
-)
+from context_os.cc_lens_url import resolve_cc_lens_base_url
 
 BASE_URL = "http://localhost:3001"
-_AUTH_FAILED = False  # set by api_get() on the first 401 so main() can exit cleanly
 
 # ─── Waste categories ──────────────────────────────────────────────────────────
 
@@ -97,25 +83,11 @@ CATEGORY_FIXES = {
 # ─── API helpers ───────────────────────────────────────────────────────────────
 
 def api_get(path, timeout=60):
-    """GET from the cc-lens API. Returns parsed JSON or None on failure.
-
-    Sends auth headers from resolve_cc_lens_auth(). On 401, sets the module-level
-    _AUTH_FAILED flag so callers can produce a clean actionable error instead of
-    a stack trace.
-    """
-    global _AUTH_FAILED
+    """GET from the cc-lens API. Returns parsed JSON or None on failure."""
     url = f"{BASE_URL}{path}"
-    req = urllib.request.Request(url, headers=resolve_cc_lens_auth())
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
             return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        if e.code == 401:
-            _AUTH_FAILED = True
-            print(f"[ERROR] GET {path}: HTTP 401 Unauthorized", file=sys.stderr)
-        else:
-            print(f"[ERROR] GET {path}: HTTP {e.code} {e.reason}", file=sys.stderr)
-        return None
     except Exception as e:
         print(f"[ERROR] GET {path}: {e}", file=sys.stderr)
         return None
@@ -1117,14 +1089,11 @@ def run(args):
     print("[cc-lens] Fetching projects...", flush=True)
     projects_data = api_get("/api/projects")
     if not projects_data:
-        if _AUTH_FAILED:
-            print(cc_lens_auth_hint(), file=sys.stderr)
-        else:
-            print(
-                f"[ERROR] Cannot reach cc-lens at {BASE_URL} — is it running? "
-                "Set CC_LENS_BASE_URL if the dashboard uses another port.",
-                file=sys.stderr,
-            )
+        print(
+            f"[ERROR] Cannot reach cc-lens at {BASE_URL} — is it running? "
+            "Set CC_LENS_BASE_URL if the dashboard uses another port.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     all_projects = (
@@ -1235,6 +1204,37 @@ def run(args):
         json.dump(spec, f, indent=2, default=str)
     print(f"[cc-lens] Spec written to: {output_path}", flush=True)
 
+    # ── 8b. Emit multi-variant recommendations JSON (feature b) ───────────────
+    try:
+        from context_os.recommendations import generate_from_spec
+        recs_by_session = generate_from_spec(spec)
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        recs_path = args.recs_output or f"C:/tmp/context-os-recs-{ts}.json"
+        try:
+            import os as _os
+            _os.makedirs(_os.path.dirname(recs_path) or ".", exist_ok=True)
+        except OSError:
+            recs_path = f"/tmp/context-os-recs-{ts}.json"
+        recs_payload = {
+            "generated_at": spec.get("generated_at"),
+            "source_spec":  output_path,
+            "recommendations_by_session": recs_by_session,
+        }
+        with open(recs_path, "w", encoding="utf-8") as f:
+            json.dump(recs_payload, f, indent=2, default=str)
+        # Stable "latest" pointer for the live dashboard (feature a).
+        try:
+            latest = "C:/tmp/context-os-recs-latest.json"
+            import os as _os
+            _os.makedirs(_os.path.dirname(latest), exist_ok=True)
+            with open(latest, "w", encoding="utf-8") as f:
+                json.dump(recs_payload, f, indent=2, default=str)
+        except OSError:
+            pass
+        print(f"[cc-lens] Recommendations written to: {recs_path}", flush=True)
+    except Exception as _e:
+        print(f"[cc-lens] Recommendations generation skipped: {_e}", file=sys.stderr, flush=True)
+
     # ── 9. Console summary ────────────────────────────────────────────────────
     summary    = spec["summary"]
     cat_totals = spec["waste_category_totals"]
@@ -1285,6 +1285,10 @@ def main():
     parser.add_argument(
         "--sessions-per-project", type=int, default=3,
         help="Top outlier sessions to include per project (default: 3)",
+    )
+    parser.add_argument(
+        "--recs-output", type=str, default=None,
+        help="Output path for multi-variant recommendations JSON (default: C:/tmp/context-os-recs-<ts>.json)",
     )
     args = parser.parse_args()
     run(args)
