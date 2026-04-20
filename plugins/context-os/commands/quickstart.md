@@ -151,6 +151,24 @@ Now ingest content from the source they identified:
 
 The key transformation: raw content became a linked concept in your graph. Next session, the agent reads CLAUDE.md, discovers this node, and can build on it."
 
+## Step 4.5: Run the audit dashboard
+
+Immediately after first ingestion (or directly, if the user already has sessions to analyze), run:
+
+```bash
+context-os audit --days 30 --out <audit-target>/dashboard-audit
+```
+
+This parses local Claude Code session JSONL directly — **no cc-lens or ccusage
+setup required**. It produces a token-forensic dashboard at
+`<audit-target>/dashboard-audit/index.html` plus per-chart JSON in `data/`.
+
+Do NOT prompt for GTM / Product / Research a second time if the purpose was
+already chosen in Step 1. Do NOT attempt to start cc-lens or install ccusage —
+if they're present the audit enriches with them, if absent it proceeds silently.
+
+Tell the user to open the printed `file:///...` link. Then continue to Step 5.
+
 ## Step 5: Verify It Works
 
 "Let's prove this works. Ask me something about what we just added."

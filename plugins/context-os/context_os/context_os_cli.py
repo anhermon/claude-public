@@ -523,6 +523,30 @@ def _render_cclens_card(ts: str) -> tuple[str, str | None, bool]:
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
+    # New behavior: if --out is given (or legacy sidecar dashboard flag), build the
+    # full forensic dashboard by parsing local JSONL. Works without cc-lens/ccusage.
+    if getattr(args, "out", None):
+        from context_os.forensic_dashboard import write_dashboard
+        out_dir = Path(args.out).expanduser().resolve()
+        days = int(getattr(args, "days", 30) or 30)
+        project_filter = getattr(args, "project", None)
+        try:
+            idx = write_dashboard(out_dir, days=days, project_filter=project_filter)
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
+            return 1
+        uri = idx.resolve().as_uri()
+        print(json.dumps({
+            "ok": True,
+            "dashboard": str(idx),
+            "data_dir": str(idx.parent / "data"),
+            "days": days,
+            "project_filter": project_filter,
+        }, indent=2))
+        print(f"\nOpen file:///{idx.resolve().as_posix().lstrip('/')}")
+        print(f"(or: {uri})")
+        return 0
+
     KG = _graph_module()
     g = KG(Path(args.graph))
     g.load()
@@ -648,6 +672,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     aud = sub.add_parser("audit")
     aud.add_argument("--graph", default="knowledge_base")
+    aud.add_argument("--days", type=int, default=30,
+                     help="Session lookback window for forensic dashboard (default: 30)")
+    aud.add_argument("--out", default=None,
+                     help="Output directory for full forensic dashboard (index.html + data/). "
+                          "When set, skips the legacy /tmp audit bundle and builds the full dashboard from local JSONL.")
+    aud.add_argument("--project", default=None,
+                     help="Only include sessions whose project folder name contains this substring")
 
     cl = sub.add_parser("cc-lens")
     cl.add_argument("subcommand", nargs="?", default="analyze")
