@@ -142,6 +142,23 @@ This repo evolves through usage, not roadmaps:
 5. **Benchmark** — CI runs the benchmark suite on every PR. Scores are emitted as `benchmark-results.json` in a standard format.
 6. **Merge** — Only merge when benchmarks confirm the change improves (or at minimum does not regress) the overall score.
 
+### Branch Model
+
+This repo uses long-lived branches with benchmark-driven pruning:
+
+1. **Develop parallel branches** — Multiple approaches to the same problem can coexist.
+2. **Evaluate and compare** — The same benchmark suite runs on each branch for side-by-side comparison.
+3. **Pick winner / drop loser** — Higher benchmark score wins. The losing branch is cancelled.
+4. **Release candidate** — The winner is promoted to an RC for final validation.
+5. **Merge to main** — Only after RC passes all gates.
+
+### Benchmark-Driven Merge Decisions
+
+- PRs that regress the overall score below threshold are blocked.
+- When competing branches solve the same problem, CI compares their scores and recommends the winner.
+- Post-merge regressions trigger revert recommendations.
+- Benchmark history is tracked via CI artifacts for trend analysis.
+
 ---
 
 ## Contributing
