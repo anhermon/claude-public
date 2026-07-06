@@ -1,0 +1,21 @@
+{
+  "name": "review-agents",
+  "version": "1.0.0",
+  "description": "Full codebase review orchestrated across 9 specialized subagents (architecture, correctness, security, performance, observability, readability, contracts, data, ci). Use /review for a complete cross-domain report, or /review --domain security to target one dimension.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["review", "code-review", "multi-agent", "architecture", "security", "performance"],
+  "agents": [
+    "./agents/architecture-reviewer.md",
+    "./agents/correctness-reviewer.md",
+    "./agents/security-reviewer.md",
+    "./agents/performance-reviewer.md",
+    "./agents/readability-reviewer.md",
+    "./agents/error-observability-reviewer.md",
+    "./agents/api-contracts-reviewer.md",
+    "./agents/data-reviewer.md",
+    "./agents/ci-deps-reviewer.md"
+  ],
+  "commands": [
+    "./commands/review.md"
+  ]
+}

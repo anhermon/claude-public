@@ -1,0 +1,547 @@
+# =============================================================================
+# TASKFILE TEMPLATE — DH Projects Reference
+# =============================================================================
+#
+# How to use:
+#   This file is a reference, not a drop-in. Copy the tasks relevant to your
+#   project's stack, paste them into your own Taskfile.yaml, and adjust the
+#   vars block. Replace all # TODO: markers before committing.
+#
+# Stacks covered:
+#   A. Python backend (FastAPI + uv)          → tasks prefixed with py:
+#   B. TypeScript backend (Bun + Hono/Express) → tasks prefixed with ts:
+#   C. Full-stack (Python + Vite/Node)         → tasks: dev, stop, kill:*, etc.
+#   D. Infra / K8s / Docker                    → tasks: docker:*, push, stage:*, ci:pipeline*
+#
+# Rules baked into every pattern below:
+#   - stop clears build caches, not just kills processes
+#   - clean calls stop first
+#   - dev calls env:check, then stop, then sequential starts with readiness
+#   - every background start has exactly one readiness poll (owned by the start task)
+#   - every kill:* ends with `sleep 1`
+#   - no `kubectl config use-context` — use --context= per command
+#   - docker buildx create --use || true  (idempotent)
+#   - task names use colons for namespacing, never hyphens
+#   - internal: true on all implementation steps
+# =============================================================================
+
+version: '3'
+
+# =============================================================================
+# VARS — merge what you need into your own vars: block
+# =============================================================================
+vars:
+  # --- Ports ---
+  BACKEND_PORT: '8000'            # TODO: set your backend port
+  FRONTEND_PORT: '5173'          # TODO: Vite=5173, Next.js=3000
+
+  # --- Python ---
+  APP_MODULE: 'src.main:app'      # TODO: ASGI entry point (module:factory)
+  NEXUS_INDEX: 'https://nexus.your-org.example/repository/pypi/simple'
+  TEST_DIR: 'tests'               # TODO: test root directory
+
+  # --- Frontend ---
+  FRONTEND_DIR: 'frontend'       # TODO: path to frontend subdirectory
+
+  # --- Docker / Registry ---
+  ACR_NAME: 'dhbasic'                          # TODO: verify
+  IMAGE_REGISTRY: 'dhbasic.azurecr.io'         # TODO: verify
+  IMAGE_NAME: 'my-service'                      # TODO: your service name
+  IMAGE_TAG: ''                                 # Set by CI: {{.BUILD_BUILDNUMBER}}
+
+  # --- Kubernetes ---
+  # RULE: Declare KUBE_CONTEXT here. Pass --context={{.KUBE_CONTEXT}} on every
+  # kubectl/helm invocation. NEVER use `kubectl config use-context` in tasks —
+  # it mutates ~/.kube/config globally and leaves the dev on the wrong cluster
+  # if the task fails mid-way.
+  KUBE_CONTEXT: 'dev-aks-westus-4040c1'        # TODO: verify context name
+  STAGE_NAMESPACE: 'my-service-staging'         # TODO: set
+  STAGE_APP: 'my-service-staging'              # TODO: ArgoCD app name
+  STAGE_DEPLOYMENT: 'my-service'               # TODO: k8s Deployment name (used in label selector)
+  STAGE_SVC_NAME: 'my-service-svc'             # TODO: k8s Service name
+  STAGE_LOCAL_PORT: '18000'                    # TODO: local port for port-forward
+  STAGE_SVC_PORT: '80'                         # TODO: service port in cluster
+
+  # --- CI / AzDO ---
+  AZDO_ORG: 'https://dev.azure.com/YourOrg'
+  AZDO_PROJECT: 'Infra'                        # TODO: verify project
+  PIPELINE_ID: ''                              # TODO: pipeline definition ID
+
+tasks:
+
+  # ---------------------------------------------------------------------------
+  # UNIVERSAL — keep in every project
+  # ---------------------------------------------------------------------------
+
+  default:
+    desc: List available tasks
+    cmd: task --list
+    silent: true
+
+  env:check:
+    internal: true
+    # First command in every `dev` task. Fail fast before starting any process.
+    cmds:
+      - |
+        if [ ! -f .env ] && [ ! -f .env.local ]; then
+          echo "ERROR: No .env or .env.local found."
+          echo "Run: task secrets:decrypt"
+          exit 1
+        fi
+
+  # ---------------------------------------------------------------------------
+  # SECTION A — PYTHON BACKEND (FastAPI + uv)
+  # ---------------------------------------------------------------------------
+
+  kill:backend:
+    desc: Kill any process on port {{.BACKEND_PORT}}
+    # Port-based kill is safer than pkill -f — only kills our port, not other projects.
+    cmd: |
+      lsof -ti:{{.BACKEND_PORT}} | xargs kill -9 2>/dev/null || true
+      sleep 1    # let the kernel reap the socket before the next task reads the port
+    silent: true
+
+  stop:
+    desc: Stop backend and clear all build caches
+    cmds:
+      - task: kill:backend
+      # Clear Python bytecode caches — stale .pyc files shadow edited source files.
+      - find . -type d -name __pycache__ | xargs rm -rf 2>/dev/null || true
+      - find . -name '*.pyc' -delete 2>/dev/null || true
+      - rm -rf .pytest_cache .ruff_cache .mypy_cache
+
+  clean:
+    desc: Deep clean — stops services first, removes all artifacts
+    cmds:
+      # RULE: stop before deleting — a running process may be writing to these dirs.
+      - task: stop
+      - rm -rf dist/ build/ *.egg-info/
+
+  dev:
+    desc: Start backend dev server with hot reload on :{{.BACKEND_PORT}}
+    cmds:
+      - task: env:check
+      - task: stop
+      - uv run uvicorn {{.APP_MODULE}} --reload --host 0.0.0.0 --port {{.BACKEND_PORT}}
+
+  prep:
+    desc: Sync Python dependencies via uv
+    cmds:
+      - uv sync --index-url {{.NEXUS_INDEX}}
+
+  dep:upgrade:
+    desc: "Upgrade a dep via uv (usage: task dep:upgrade PKG=httpx>=0.27)"
+    cmds:
+      - uv add --index-url {{.NEXUS_INDEX}} "{{.PKG}}"
+      - uv sync --index-url {{.NEXUS_INDEX}}
+
+  test:
+    desc: Run all tests with coverage
+    cmds:
+      - uv run pytest {{.TEST_DIR}} --cov=src --cov-report=term --cov-report=xml -v
+
+  test:unit:
+    desc: Run unit tests only
+    cmds:
+      - uv run pytest {{.TEST_DIR}}/unit -v
+
+  test:integration:
+    desc: Run integration tests only
+    cmds:
+      - uv run pytest {{.TEST_DIR}}/integration -v
+
+  test:ci:
+    desc: Run CI tests (excludes integration and e2e)
+    cmds:
+      - uv run pytest {{.TEST_DIR}} \
+          --ignore={{.TEST_DIR}}/integration \
+          --ignore={{.TEST_DIR}}/e2e \
+          --cov=src --cov-report=xml --cov-report=term
+
+  lint:
+    desc: Lint with ruff
+    cmds:
+      - uv run ruff check src/ {{.TEST_DIR}}/
+
+  lint:fix:
+    desc: Auto-fix lint issues and format
+    cmds:
+      - uv run ruff check --fix --unsafe-fixes src/ {{.TEST_DIR}}/
+      - uv run ruff format src/ {{.TEST_DIR}}/
+
+  format:
+    desc: Format with ruff
+    cmds:
+      - uv run ruff format src/ {{.TEST_DIR}}/
+
+  security:
+    desc: Security scans (bandit + pip-audit)
+    cmds:
+      - uv run bandit -c pyproject.toml -ll -r src/
+      - uv run pip-audit
+
+  precommit:install:
+    desc: Install pre-commit hooks
+    cmds:
+      - uv run pre-commit install
+      - uv run pre-commit install --hook-type commit-msg
+
+  precommit:run:
+    desc: Run pre-commit on all files
+    cmds:
+      - uv run pre-commit run --all-files
+
+  precommit:update:
+    desc: Update pre-commit hook versions
+    cmds:
+      - uv run pre-commit autoupdate
+
+  ci:
+    desc: Full local CI pass (lint:fix → lint → security → test:ci)
+    cmds:
+      - task: lint:fix
+      - task: lint
+      - task: security
+      - task: test:ci
+
+  # ---------------------------------------------------------------------------
+  # SECTION B — TYPESCRIPT BACKEND (Bun + Hono or Express)
+  # Replace Section A tasks above with these when using a TS backend.
+  # Rename to avoid collision: if coexisting with Section A, prefix with ts:.
+  # ---------------------------------------------------------------------------
+
+  ts:install:
+    desc: Install dependencies
+    # status: guard prevents re-running when node_modules already exists.
+    status:
+      - test -d node_modules
+    cmd: bun install
+
+  ts:install:clean:
+    desc: Clean install (removes node_modules first)
+    cmds:
+      - rm -rf node_modules
+      - bun install
+
+  ts:dev:
+    desc: Start backend dev server with Bun watch on :{{.BACKEND_PORT}}
+    cmds:
+      - task: env:check
+      - task: kill:backend
+      - bun --watch src/index.ts  # TODO: adjust entry point
+
+  ts:build:
+    desc: Compile TypeScript to dist/
+    cmd: bun run build
+
+  ts:start:
+    desc: Start backend in production mode
+    cmd: bun src/index.ts  # TODO: adjust entry point
+
+  ts:test:
+    desc: Run all tests
+    cmd: bun test
+
+  ts:test:watch:
+    desc: Run tests in watch mode
+    cmd: bun test --watch
+
+  ts:test:coverage:
+    desc: Run tests with coverage
+    cmd: bun test --coverage
+
+  ts:lint:
+    desc: TypeScript type check
+    cmd: bunx tsc --noEmit
+
+  ts:ci:
+    desc: Full local CI pass (lint → test)
+    cmds:
+      - task: ts:lint
+      - task: ts:test
+
+  # ---------------------------------------------------------------------------
+  # SECTION C — FULL-STACK (Python backend + Vite/Node frontend)
+  # Extend stop/clean from Section A to also handle frontend artifacts.
+  # Replace the simple `dev` from Section A with this orchestrated version.
+  # ---------------------------------------------------------------------------
+
+  kill:frontend:
+    cmd: |
+      # NOTE: pkill -f "vite" matches ANY process with "vite" in its argv —
+      # including other projects. Acceptable on single-project machines.
+      pkill -9 -f "vite" 2>/dev/null || true
+      lsof -ti:{{.FRONTEND_PORT}} | xargs kill -9 2>/dev/null || true
+      sleep 1    # let the kernel reap before the next task reads the port
+    silent: true
+
+  # Extend stop to also clear frontend artifacts.
+  # In your actual Taskfile, merge these into the single `stop` task.
+  stop:fullstack:
+    desc: Stop all services and clear all build caches (full-stack version)
+    cmds:
+      - task: kill:frontend
+      - task: kill:backend
+      # Clear framework build dirs — they accumulate stale state across restarts.
+      # Use dist for Vite; use .next for Next.js.
+      - rm -rf {{.FRONTEND_DIR}}/dist {{.FRONTEND_DIR}}/.next
+      - find . -type d -name __pycache__ | xargs rm -rf 2>/dev/null || true
+      - find . -name '*.pyc' -delete 2>/dev/null || true
+
+  dev:fullstack:
+    desc: Start full dev environment (backend + frontend, logs to ./logs/)
+    cmds:
+      - task: env:check             # 1. fail fast if secrets missing
+      - task: stop:fullstack        # 2. kill + clear caches — clean slate
+      - mkdir -p logs               # 3. ensure log dir exists
+      - task: dev:backend:start     # 4. start backend, poll /health
+      - task: dev:frontend:start    # 5. start frontend, poll port
+      - task: dev:tail-logs         # 6. only reached when both confirmed healthy
+
+  dev:backend:start:
+    internal: true
+    cmds:
+      # > truncates — old session errors must not bleed into new sessions.
+      - nohup uv run uvicorn {{.APP_MODULE}} --reload --host 0.0.0.0 --port {{.BACKEND_PORT}} > logs/backend.log 2>&1 &
+      # Single readiness check owned by this task — orchestrator trusts this return value.
+      - sh -c 'i=0; until curl -sf http://localhost:{{.BACKEND_PORT}}/health > /dev/null 2>&1; do
+          sleep 1; i=$((i+1));
+          [ $i -ge 30 ] && echo "Backend failed to start — check logs/backend.log" && exit 1;
+        done; echo "Backend ready at http://localhost:{{.BACKEND_PORT}}"'
+
+  dev:frontend:start:
+    internal: true
+    dir: '{{.FRONTEND_DIR}}'
+    cmds:
+      # Clear Vite cache before starting — stale cache causes "my change is not reflected" bugs.
+      - rm -rf dist .next
+      - sh -c 'npm run dev > ../../logs/frontend.log 2>&1 & disown'
+      # Vite: 2-5s to bind. Next.js: 15-40s for first compile. Poll the port.
+      - sh -c 'i=0; until curl -sf http://localhost:{{.FRONTEND_PORT}} > /dev/null 2>&1; do
+          sleep 1; i=$((i+1));
+          [ $i -ge 60 ] && echo "Frontend failed to start — check logs/frontend.log" && exit 1;
+        done; echo "Frontend ready at http://localhost:{{.FRONTEND_PORT}}"'
+
+  dev:tail-logs:
+    internal: true
+    cmd: |
+      echo ""
+      echo "Dev environment ready. Tailing logs (Ctrl+C to stop tailing)..."
+      tail -f logs/backend.log logs/frontend.log 2>/dev/null
+
+  # Targeted restart tasks — developers bounce the frontend far more than the full stack.
+  # Without these they are forced to restart everything.
+  dev:restart:backend:
+    desc: Restart only the backend (frontend stays running)
+    cmds:
+      - task: kill:backend
+      - task: dev:backend:start
+      - task: dev:tail-logs
+
+  dev:restart:frontend:
+    desc: Restart only the frontend (backend stays running)
+    cmds:
+      - task: kill:frontend
+      - task: dev:frontend:start
+      - task: dev:tail-logs
+
+  install:frontend:
+    desc: Install frontend npm dependencies
+    dir: '{{.FRONTEND_DIR}}'
+    # status: guard prevents npm install on every invocation.
+    status:
+      - test -d node_modules
+    cmd: npm install
+
+  build:frontend:
+    desc: Build frontend for production
+    dir: '{{.FRONTEND_DIR}}'
+    # NOTE: sources/generates are always repo-root-relative, even though
+    # dir: changes the working directory for cmds. Document this inconsistency.
+    sources:
+      - '{{.FRONTEND_DIR}}/src/**/*.{ts,tsx}'
+      - '{{.FRONTEND_DIR}}/package.json'
+    generates:
+      - '{{.FRONTEND_DIR}}/dist/**/*'
+    cmd: npm run build
+
+  test:frontend:
+    desc: Run frontend unit tests
+    dir: '{{.FRONTEND_DIR}}'
+    cmd: npm run test -- --run
+
+  test:frontend:e2e:
+    desc: Run frontend E2E tests (requires running servers)
+    dir: '{{.FRONTEND_DIR}}'
+    cmd: npm run test:e2e
+
+  lint:frontend:
+    desc: ESLint on frontend
+    dir: '{{.FRONTEND_DIR}}'
+    cmd: npm run lint || true
+
+  # ---------------------------------------------------------------------------
+  # SECTION D — INFRA / K8s / DOCKER
+  # Applicable to any project with Docker images and a staging K8s cluster.
+  # ---------------------------------------------------------------------------
+
+  docker:build:
+    desc: Build multi-arch image (amd64+arm64) — for CI/staging push
+    cmds:
+      # || true — idempotent: a buildx builder may already exist.
+      - docker buildx create --use || true
+      - docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          -f Dockerfile \
+          -t {{.IMAGE_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} \
+          .
+
+  docker:build:local:
+    desc: Build single-arch image for local Docker Desktop (loads to daemon)
+    # Do NOT use --platform with --load on Apple Silicon — buildx cross-compilation
+    # can produce incomplete images the daemon cannot run. Build native arch only.
+    cmds:
+      - docker build -f Dockerfile -t {{.IMAGE_NAME}}:local .
+
+  push:
+    desc: Login to ACR and push multi-arch image
+    cmds:
+      - az acr login --name {{.ACR_NAME}}
+      - docker buildx create --use || true
+      - docker buildx build \
+          --platform linux/amd64,linux/arm64 \
+          -f Dockerfile \
+          -t {{.IMAGE_REGISTRY}}/{{.IMAGE_NAME}}:{{.IMAGE_TAG}} \
+          --push \
+          .
+
+  # Internal helper — resolves the current staging pod name.
+  # Consumer tasks repeat the kubectl get pod inline to avoid cross-step
+  # variable scoping issues.
+  stage:pod:
+    internal: true
+    cmd: |
+      kubectl --context={{.KUBE_CONTEXT}} get pod \
+        -n {{.STAGE_NAMESPACE}} \
+        -l app.kubernetes.io/name={{.STAGE_DEPLOYMENT}} \
+        -o jsonpath='{.items[0].metadata.name}'
+
+  stage:exec:
+    desc: "Exec into staging pod (usage: task stage:exec -- <command>)"
+    cmds:
+      - |
+        POD=$(kubectl --context={{.KUBE_CONTEXT}} get pod \
+          -n {{.STAGE_NAMESPACE}} \
+          -l app.kubernetes.io/name={{.STAGE_DEPLOYMENT}} \
+          -o jsonpath='{.items[0].metadata.name}')
+        kubectl --context={{.KUBE_CONTEXT}} exec -it "$POD" \
+          -n {{.STAGE_NAMESPACE}} -- {{.CLI_ARGS}}
+
+  stage:logs:
+    desc: Tail staging pod logs
+    cmds:
+      - |
+        POD=$(kubectl --context={{.KUBE_CONTEXT}} get pod \
+          -n {{.STAGE_NAMESPACE}} \
+          -l app.kubernetes.io/name={{.STAGE_DEPLOYMENT}} \
+          -o jsonpath='{.items[0].metadata.name}')
+        kubectl --context={{.KUBE_CONTEXT}} logs -f "$POD" -n {{.STAGE_NAMESPACE}}
+
+  stage:pf:
+    desc: Port-forward staging svc to localhost:{{.STAGE_LOCAL_PORT}}
+    cmds:
+      - |
+        # RULE: poll curl after starting port-forward — never sleep N and pray.
+        # Port-forward takes 1-5s to bind depending on cluster latency.
+        kubectl --context={{.KUBE_CONTEXT}} port-forward \
+          -n {{.STAGE_NAMESPACE}} \
+          svc/{{.STAGE_SVC_NAME}} \
+          {{.STAGE_LOCAL_PORT}}:{{.STAGE_SVC_PORT}} &
+        PFPID=$!
+        trap "kill $PFPID 2>/dev/null" EXIT INT TERM
+        i=0; until curl -sf http://localhost:{{.STAGE_LOCAL_PORT}} > /dev/null 2>&1; do
+          sleep 1; i=$((i+1))
+          [ $i -ge 15 ] && echo "Port-forward not ready after 15s" && exit 1
+        done
+        echo "Port-forward ready at http://localhost:{{.STAGE_LOCAL_PORT}}"
+        wait $PFPID
+
+  stage:image:
+    desc: Show image tag currently running in staging
+    cmds:
+      - |
+        kubectl --context={{.KUBE_CONTEXT}} get pod \
+          -n {{.STAGE_NAMESPACE}} \
+          -l app.kubernetes.io/name={{.STAGE_DEPLOYMENT}} \
+          -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}'
+
+  stage:status:
+    desc: Show staging pod and ArgoCD app status
+    cmds:
+      - |
+        echo "=== Pods ==="
+        kubectl --context={{.KUBE_CONTEXT}} get pods \
+          -n {{.STAGE_NAMESPACE}} \
+          -l app.kubernetes.io/name={{.STAGE_DEPLOYMENT}} \
+          -o wide
+        echo ""
+        echo "=== ArgoCD ==="
+        kubectl --context={{.KUBE_CONTEXT}} \
+          get applications.argoproj.io {{.STAGE_APP}} \
+          -n argocd \
+          -o jsonpath='Sync: {.status.sync.status}{"\n"}Health: {.status.health.status}{"\n"}Branch: {.spec.source.targetRevision}{"\n"}'
+
+  stage:argocd:set-branch:
+    desc: "Point staging ArgoCD app at a branch (usage: task stage:argocd:set-branch BRANCH=my-branch)"
+    cmds:
+      - |
+        BRANCH="{{.BRANCH}}"
+        if [ -z "$BRANCH" ]; then
+          echo "Usage: task stage:argocd:set-branch BRANCH=<branch>"
+          exit 1
+        fi
+        kubectl --context={{.KUBE_CONTEXT}} patch applications.argoproj.io {{.STAGE_APP}} \
+          -n argocd --type=merge \
+          -p "{\"spec\":{\"source\":{\"targetRevision\":\"$BRANCH\"}}}"
+        kubectl --context={{.KUBE_CONTEXT}} annotate applications.argoproj.io {{.STAGE_APP}} \
+          -n argocd argocd.argoproj.io/refresh=hard --overwrite
+        echo "Staging now targeting: $BRANCH (hard refresh triggered)"
+
+  ci:pipeline:
+    desc: Show last 5 pipeline builds
+    cmds:
+      - |
+        az pipelines build list \
+          --org {{.AZDO_ORG}} \
+          --project {{.AZDO_PROJECT}} \
+          --definition-id {{.PIPELINE_ID}} \
+          --top 5 2>&1 | python3 -c "
+        import sys, json
+        builds = json.loads(sys.stdin.read())
+        for b in builds:
+            result = b.get('result') or b.get('status', 'inProgress')
+            branch = b['sourceBranch'].replace('refs/heads/', '')
+            print(f\"{b['buildNumber']:20s} {result:12s} {branch:35s} {b['sourceVersion'][:8]}\")
+        "
+
+  ci:pipeline:watch:
+    desc: "Poll pipeline build until complete (usage: task ci:pipeline:watch BUILD_ID=12345)"
+    cmds:
+      - |
+        BUILD_ID="{{.BUILD_ID}}"
+        if [ -z "$BUILD_ID" ]; then
+          echo "Usage: task ci:pipeline:watch BUILD_ID=<id>"
+          exit 1
+        fi
+        while true; do
+          OUT=$(az pipelines build show \
+            --org {{.AZDO_ORG}} \
+            --project {{.AZDO_PROJECT}} \
+            --id "$BUILD_ID" 2>&1)
+          STATUS=$(echo "$OUT" | python3 -c "import sys,json; b=json.load(sys.stdin); print(b.get('status',''))")
+          RESULT=$(echo "$OUT" | python3 -c "import sys,json; b=json.load(sys.stdin); print(b.get('result','') or 'inProgress')")
+          NUM=$(echo "$OUT" | python3 -c "import sys,json; b=json.load(sys.stdin); print(b.get('buildNumber',''))")
+          echo "$(date '+%H:%M:%S')  build=$NUM  status=$STATUS  result=$RESULT"
+          [ "$STATUS" = "completed" ] && echo "Done: $RESULT" && break
+          sleep 30
+        done

@@ -160,6 +160,34 @@
         "path": "plugins/context-os",
         "ref": "main"
       }
+    },
+    {
+      "name": "dev-guidelines",
+      "description": "General development guidelines — CI/infra decision trees, testing philosophy, Taskfile conventions, and an interactive review companion. Company-agnostic; routes to a local `org` skill for org-specific detail.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/dev-guidelines",
+        "ref": "main"
+      }
+    },
+    {
+      "name": "review-agents",
+      "description": "Full codebase review orchestrated across 9 specialized subagents (architecture, correctness, security, performance, observability, readability, contracts, data, ci) via /review.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/review-agents",
+        "ref": "main"
+      }
     }
   ]
 }

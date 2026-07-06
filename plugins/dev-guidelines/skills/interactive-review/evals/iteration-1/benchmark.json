@@ -1,0 +1,319 @@
+{
+  "metadata": {
+    "skill_name": "interactive-review",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-03-21T01:16:11Z",
+    "evals_run": [
+      1,
+      2,
+      3
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 1,
+      "eval_name": "Plan review trigger",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses interactive-review (not render-output) because feedback is needed before proceeding",
+          "passed": true,
+          "evidence": "Agent explicitly chose server.py (interactive-review) not render.py, reasoning that feedback is required before implementation"
+        },
+        {
+          "text": "writes content to a temp markdown file first",
+          "passed": true,
+          "evidence": "Writes plan to /tmp/auth-migration-review.md before launching server"
+        },
+        {
+          "text": "launches server.py with --title flag on port 3118",
+          "passed": true,
+          "evidence": "python3 ~/.claude/skills/interactive-review/server.py ... --title 'Auth Service Migration Plan' on port 3118"
+        },
+        {
+          "text": "tells user the URL and waits \u2014 does not auto-proceed",
+          "passed": true,
+          "evidence": "Says 'Rendered \u2192 http://localhost:3118 \u2014 review and submit feedback' and explicitly stops"
+        },
+        {
+          "text": "reads feedback.json after user submits and iterates if non-empty",
+          "passed": true,
+          "evidence": "cat /tmp/auth-migration-workspace/feedback.json; applies stopping conditions and loops"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Send for review trigger",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 5,
+        "failed": 0,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses interactive-review because 'send for review' is an explicit trigger phrase",
+          "passed": true,
+          "evidence": "Agent identified 'send for review' as trigger and chose interactive-review over render-output"
+        },
+        {
+          "text": "writes structured markdown task breakdown to /tmp/",
+          "passed": true,
+          "evidence": "Writes task breakdown to /tmp/api-redesign-review.md"
+        },
+        {
+          "text": "launches interactive-review server \u2014 not render-output generator",
+          "passed": true,
+          "evidence": "Runs server.py, not render.py; correct port 3118"
+        },
+        {
+          "text": "includes --workspace flag to capture feedback",
+          "passed": true,
+          "evidence": "--workspace /tmp/api-redesign-workspace flag present"
+        },
+        {
+          "text": "stops and waits for user feedback before making any changes",
+          "passed": true,
+          "evidence": "Explicit stop after rendering; does not proceed to implementation"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Final report \u2014 use render-output not interactive-review",
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 4,
+        "failed": 0,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses render-output (not interactive-review) because output is described as final",
+          "passed": true,
+          "evidence": "Agent correctly routes to render-output, quoting the decision table: 'final' + 'agreed on' \u2192 no feedback needed"
+        },
+        {
+          "text": "does NOT launch interactive-review server or wait for feedback",
+          "passed": true,
+          "evidence": "No server.py invocation; no stop-and-wait; proceeds directly to render"
+        },
+        {
+          "text": "calls render.py generator script",
+          "passed": true,
+          "evidence": "Agent describes running python3 ~/.claude/skills/render-output/generator/render.py"
+        },
+        {
+          "text": "output is opened directly without a feedback form",
+          "passed": true,
+          "evidence": "Browser opens with static report; no feedback form presented"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "eval_name": "Plan review trigger",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.0,
+        "passed": 0,
+        "failed": 5,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses interactive-review (not render-output) because feedback is needed before proceeding",
+          "passed": false,
+          "evidence": "No browser rendering at all \u2014 shows plan inline in chat"
+        },
+        {
+          "text": "writes content to a temp markdown file first",
+          "passed": false,
+          "evidence": "No file writing; content displayed in-chat only"
+        },
+        {
+          "text": "launches server.py with --title flag on port 3118",
+          "passed": false,
+          "evidence": "No server launched"
+        },
+        {
+          "text": "tells user the URL and waits \u2014 does not auto-proceed",
+          "passed": false,
+          "evidence": "Asks open-ended 'does this look good?' with no structured approval gate"
+        },
+        {
+          "text": "reads feedback.json after user submits and iterates if non-empty",
+          "passed": false,
+          "evidence": "No feedback.json mechanism; interprets free-form chat response ad hoc"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "Send for review trigger",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.2,
+        "passed": 1,
+        "failed": 4,
+        "total": 5,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses interactive-review because 'send for review' is an explicit trigger phrase",
+          "passed": false,
+          "evidence": "No concept of interactive-review; generates breakdown inline and asks for clarification on where to send"
+        },
+        {
+          "text": "writes structured markdown task breakdown to /tmp/",
+          "passed": false,
+          "evidence": "No file writing \u2014 output produced in chat only"
+        },
+        {
+          "text": "launches interactive-review server \u2014 not render-output generator",
+          "passed": false,
+          "evidence": "No server launched"
+        },
+        {
+          "text": "includes --workspace flag to capture feedback",
+          "passed": false,
+          "evidence": "No workspace or feedback capture mechanism"
+        },
+        {
+          "text": "stops and waits for user feedback before making any changes",
+          "passed": true,
+          "evidence": "Agent does stop and ask for clarification about where to send and for project context \u2014 passive stop, not structured"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "Final report \u2014 use render-output not interactive-review",
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.25,
+        "passed": 1,
+        "failed": 3,
+        "total": 4,
+        "time_seconds": 0.0,
+        "tokens": 0,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "uses render-output (not interactive-review) because output is described as final",
+          "passed": false,
+          "evidence": "No render-output skill awareness; improvises basic HTML file with open command"
+        },
+        {
+          "text": "does NOT launch interactive-review server or wait for feedback",
+          "passed": true,
+          "evidence": "Agent correctly does not launch any feedback server \u2014 though for wrong reasons (not aware of interactive-review at all)"
+        },
+        {
+          "text": "calls render.py generator script",
+          "passed": false,
+          "evidence": "No knowledge of render.py; improvises with raw HTML or pandoc"
+        },
+        {
+          "text": "output is opened directly without a feedback form",
+          "passed": false,
+          "evidence": "Output method is inconsistent \u2014 offers multiple options rather than taking direct action"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.15,
+        "stddev": 0.1323,
+        "min": 0.0,
+        "max": 0.25
+      },
+      "time_seconds": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "tokens": {
+        "mean": 0.0,
+        "stddev": 0.0,
+        "min": 0,
+        "max": 0
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.85",
+      "time_seconds": "+0.0",
+      "tokens": "+0"
+    }
+  },
+  "notes": []
+}

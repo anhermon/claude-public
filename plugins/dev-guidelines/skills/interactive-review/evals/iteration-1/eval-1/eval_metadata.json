@@ -1,0 +1,1 @@
+{"eval_id": 1, "eval_name": "Plan review trigger", "prompt": "I just finished drafting a migration plan for the auth service. Show it to the user and get their feedback before we proceed with implementation."}

@@ -4,11 +4,11 @@ Angel Hermon's public collection of Claude Code plugins — install them directl
 
 ## Claude Code marketplace
 
-This repository is a **marketplace**: it includes [\".claude-plugin/marketplace.json\"]. In Claude Code, add the marketplace URL:
+This repository is a **marketplace**: it includes [".claude-plugin/marketplace.json"]. In Claude Code, add the marketplace URL:
 
 `https://github.com/anhermon/claude-public`
 
-Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under [\"plugins/\"].
+Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under ["plugins/"].
 
 Plugin entries use **`git-subdir`** sources so each plugin can be fetched from this monorepo without separate repositories.
 
@@ -55,7 +55,7 @@ claude install anhermon/claude-public/commit.plugin
 
 Finds definitions, call sites, and usages with structural awareness. Faster and more precise than default search for large codebases.
 
-**Trigger phrases:** \"search for\", \"find where X is defined\", \"trace call sites of X\", \"how is X used\", \"explore the codebase\"
+**Trigger phrases:** "search for", "find where X is defined", "trace call sites of X", "how is X used", "explore the codebase"
 
 No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
 
@@ -66,7 +66,7 @@ No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
 
 Persists project facts, user preferences, and session snapshots to a structured `.memory/` directory.
 
-**Trigger phrases:** \"remember this\", \"recall from memory\", \"save my preferences\", \"load my memory\", \"manage project context\"
+**Trigger phrases:** "remember this", "recall from memory", "save my preferences", "load my memory", "manage project context"
 
 No prerequisites. Storage defaults to `.memory/` in current project or `~/.memory/` globally.
 
@@ -77,7 +77,7 @@ No prerequisites. Storage defaults to `.memory/` in current project or `~/.memor
 
 Orchestrates software projects through the full 7-phase BMAD lifecycle: Ideation → PRD → Architecture → Stories → Implementation → QA → Integration.
 
-**Trigger phrases:** \"/pm\", \"start a project\", \"resume project\", \"orchestrate this build\", \"BMAD lifecycle\"
+**Trigger phrases:** "/pm", "start a project", "resume project", "orchestrate this build", "BMAD lifecycle"
 
 No prerequisites. Persists state to `.memory/pm-state.json`.
 
@@ -88,7 +88,7 @@ No prerequisites. Persists state to `.memory/pm-state.json`.
 
 Efficiently search and ingest repositories that exceed context limits using structural indexing.
 
-**Trigger phrases:** \"ingest repo\", \"search indexed repo\", \"use structural search\"
+**Trigger phrases:** "ingest repo", "search indexed repo", "use structural search"
 
 Requires `uv` and `python 3.10+`.
 
@@ -99,7 +99,7 @@ Requires `uv` and `python 3.10+`.
 
 Autonomous 23-stage pipeline (ResearchClaw) for academic-depth papers or fast Claude-native synthesis (Regular Research) for structured briefs.
 
-**Trigger phrases:** \"research X\", \"/research\", \"investigate X\", \"look into X\", \"write a paper on X\", \"give me a brief on X\"
+**Trigger phrases:** "research X", "/research", "investigate X", "look into X", "write a paper on X", "give me a brief on X"
 
 No prerequisites. Web search capability recommended.
 
@@ -110,7 +110,7 @@ No prerequisites. Web search capability recommended.
 
 Maintain a living knowledge base by absorbing source documents, answering questions with citations, auditing for drift, and capturing session insights. Includes `kb-to-wiki` skill for publishing the KB as a browsable HTML wiki.
 
-**Trigger phrases:** \"ingest this\", \"add to wiki\", \"log this to KB\", \"lint the wiki\", \"check the KB\", \"find stale pages\", \"query the wiki\"
+**Trigger phrases:** "ingest this", "add to wiki", "log this to KB", "lint the wiki", "check the KB", "find stale pages", "query the wiki"
 
 No prerequisites. Vault defaults to `~/knowledge-base/`.
 
@@ -121,9 +121,31 @@ No prerequisites. Vault defaults to `~/knowledge-base/`.
 
 Visualizes session metrics, tool usage, and performance insights.
 
-**Trigger phrases:** \"set up telemetry\", \"instrument my project\", \"visualize session metrics\", \"show me telemetry dashboard\"
+**Trigger phrases:** "set up telemetry", "instrument my project", "visualize session metrics", "show me telemetry dashboard"
 
 No prerequisites. Requires Langfuse account (optional for local-only).
+
+---
+
+### dev-guidelines
+**v1.0.0** — General development guidelines: CI/infra decision trees, testing philosophy, Taskfile conventions, and an interactive review companion.
+
+Company-agnostic — routes to a local `org` skill for org-specific detail instead of assuming any particular employer's conventions.
+
+**Trigger phrases:** "what CI platform should I use", "what testing approach", "review this plan interactively"
+
+No prerequisites.
+
+---
+
+### review-agents
+**v1.0.0** — Full codebase review orchestrated across 9 specialized subagents.
+
+Architecture, correctness, security, performance, observability, readability, API contracts, data, and CI/deps — each reviewed by a dedicated subagent, combined into one report via `/review`.
+
+**Trigger phrases:** "/review", "/review --domain security", "full codebase review"
+
+No prerequisites.
 
 ---
 

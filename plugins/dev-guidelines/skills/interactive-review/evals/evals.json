@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "name": "Plan review trigger",
+    "prompt": "I just finished drafting a migration plan for the auth service. Show it to the user and get their feedback before we proceed with implementation.",
+    "expectations": [
+      "uses interactive-review (not render-output) because feedback is needed before proceeding",
+      "writes content to a temp markdown file first",
+      "launches server.py with --title flag on port 3118",
+      "tells user the URL and waits — does not auto-proceed",
+      "reads feedback.json after user submits and iterates if non-empty"
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Task breakdown send for review",
+    "prompt": "Generate a task breakdown for the API redesign project and send it for review.",
+    "expectations": [
+      "uses interactive-review because 'send for review' is an explicit trigger phrase",
+      "writes structured markdown task breakdown to /tmp/",
+      "launches interactive-review server — not render-output generator",
+      "includes --workspace flag to capture feedback",
+      "stops and waits for user feedback before making any changes"
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Final report — should use render-output instead",
+    "prompt": "Here is the final architecture summary we agreed on. Render it in the browser.",
+    "expectations": [
+      "uses render-output (not interactive-review) because output is described as final",
+      "does NOT launch interactive-review server or wait for feedback",
+      "calls render.py generator script",
+      "output is opened directly without a feedback form"
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "name": "dev-guidelines",
+  "version": "1.0.0",
+  "description": "General development guidelines: language/framework decision trees (CI platform, infra, backend/frontend stacks), testing philosophy, Taskfile conventions, and an interactive browser-based review companion. Company-specific conventions are expected to live in a separate local `org` skill that these route to.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["dev-guidelines", "ci", "infra", "testing", "taskfile", "conventions"],
+  "skills": [
+    "./skills/dev-guidelines",
+    "./skills/ci",
+    "./skills/infra",
+    "./skills/testing",
+    "./skills/taskfile-patterns",
+    "./skills/interactive-review"
+  ]
+}
