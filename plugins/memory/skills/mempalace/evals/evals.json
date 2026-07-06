@@ -1,0 +1,159 @@
+{
+  "skill_name": "mempalace",
+  "notes": "Evals test repo claims directly: recall accuracy, actual wake-up token count, search duration, and raw-vs-AAAK mode comparison. Each eval requires installing mempalace, creating a test palace with planted facts, and measuring against verifiable numbers from the repo's own claims.",
+  "setup": "pip install mempalace (if not already installed). Each eval creates a temp palace at /tmp/mempalace-eval-<id>/ and cleans up after.",
+  "evals": [
+    {
+      "id": 1,
+      "category": "integration",
+      "prompt": "Using the mempalace skill, set up a test palace and verify recall accuracy. Do the following:\n1. Install mempalace if not present (pip install mempalace)\n2. Create a temp directory /tmp/mp-eval-1/data/ and write 5 text files, each containing a clearly unique planted fact — e.g. 'The team decided to use Clerk over Auth0 on 2025-11-03 because of pricing.' Make the facts specific enough that a search query can only match the right file.\n3. Run: mempalace init /tmp/mp-eval-1/data --palace /tmp/mp-eval-1/palace\n4. Run: mempalace mine /tmp/mp-eval-1/data --palace /tmp/mp-eval-1/palace\n5. For each planted fact, run: mempalace search '<targeted query>' --palace /tmp/mp-eval-1/palace\n6. Record which facts were found at rank 1 (R@1) and within top 5 (R@5). Report the actual R@1 and R@5 as fractions (e.g. 4/5 R@1, 5/5 R@5).\n7. Time the full mine step and report wall-clock seconds.\n8. Clean up: rm -rf /tmp/mp-eval-1\n\nReport: R@1, R@5, mine duration (seconds), and whether any facts were missed.",
+      "expected_output": "Quantitative R@1 and R@5 fractions, mine duration in seconds, and specific missed facts if any.",
+      "comprehension_required": false,
+      "grepable": false,
+      "files": [],
+      "target_duration_seconds": 90,
+      "target_tokens": 800,
+      "assertions": [
+        {
+          "name": "reports_r_at_1",
+          "description": "Answer gives an explicit R@1 fraction (e.g. 4/5) not just 'found'",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "reports_r_at_5",
+          "description": "Answer gives an explicit R@5 fraction",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "reports_mine_duration",
+          "description": "Reports actual wall-clock mine time in seconds",
+          "type": "contains"
+        },
+        {
+          "name": "reports_missed_facts",
+          "description": "If any facts not in R@5, they are named specifically, not glossed over",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "uses_correct_palace_flag",
+          "description": "All commands use --palace /tmp/mp-eval-1/palace (scoped to test dir, not polluting ~/.mempalace)",
+          "type": "contains"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "category": "comprehension",
+      "prompt": "Using the mempalace skill, test the wake-up token claim. The repo claims mempalace wake-up produces ~170 tokens of critical facts.\n1. Install mempalace if not present\n2. Create a minimal test palace at /tmp/mp-eval-2/palace with a few facts (just create the identity.txt at ~/.mempalace/identity.txt with ~50 words of identity text)\n3. Run: mempalace wake-up --palace /tmp/mp-eval-2/palace 2>/dev/null\n4. Count the actual character length of the output and estimate tokens (chars / 4 is a rough estimate; for a real count, pipe through: python3 -c \"import sys; txt=sys.stdin.read(); print(len(txt.split()))\" to get word count)\n5. Report: actual output character count, estimated token count, and whether it is within 2x of the claimed ~170 tokens.\n6. Paste the first 200 chars of the actual output so we can see the AAAK format.\n7. Clean up: rm -rf /tmp/mp-eval-2\n\nBe honest about whether the output matches the claim.",
+      "expected_output": "Actual character count, token estimate, comparison against the repo's wake-up token claim, and a sample of the actual output.",
+      "comprehension_required": false,
+      "grepable": false,
+      "files": [],
+      "target_duration_seconds": 45,
+      "target_tokens": 600,
+      "assertions": [
+        {
+          "name": "reports_actual_char_count",
+          "description": "Reports a specific character count from the actual wake-up output",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "reports_token_estimate",
+          "description": "Provides an estimated token count (not just 'it produced output')",
+          "type": "contains"
+        },
+        {
+          "name": "compares_against_claim",
+          "description": "Explicitly compares measured tokens against the claimed ~170 and states whether in range",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "shows_actual_output_sample",
+          "description": "Includes at least the first 100 chars of the actual wake-up output",
+          "type": "contains"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "category": "integration",
+      "prompt": "Using the mempalace skill, compare raw search accuracy vs AAAK compressed mode. The repo claims raw mode scores 96.6% R@5 and AAAK regresses to 84.2%.\n1. Install mempalace if not present\n2. Create /tmp/mp-eval-3/data/ with 10 text files, each containing a unique retrievable fact\n3. Mine in raw mode (default): mempalace mine /tmp/mp-eval-3/data --palace /tmp/mp-eval-3/palace-raw\n4. For each of your 10 facts, run a targeted search against the raw palace and record which rank the correct fact appeared at (1-5 or not found)\n5. Now compress: mempalace compress --palace /tmp/mp-eval-3/palace-raw --wing general (or check if compress is a separate command first with: mempalace --help)\n6. Re-run the same 10 searches and record results\n7. Report: R@5 for raw mode, R@5 after compression, the difference, and whether the 12-point regression (96.6% → 84.2%) direction holds at this small scale\n8. Clean up: rm -rf /tmp/mp-eval-3\n\nNote: with only 10 facts the absolute numbers won't match the benchmark (which used 500 questions). We're testing the direction of the regression, not the magnitude.",
+      "expected_output": "R@5 fractions for both modes, direction of change, and any CLI errors with the compress command.",
+      "comprehension_required": true,
+      "grepable": false,
+      "files": [],
+      "target_duration_seconds": 120,
+      "target_tokens": 1000,
+      "assertions": [
+        {
+          "name": "reports_raw_r5",
+          "description": "Reports explicit R@5 fraction for raw mode (not just pass/fail)",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "attempts_compress_command",
+          "description": "Actually attempts the compress subcommand and reports what it does or any error",
+          "type": "contains"
+        },
+        {
+          "name": "reports_direction_of_regression",
+          "description": "States whether AAAK helped, hurt, or made no difference at this small scale",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "honest_about_scale_limits",
+          "description": "Notes that 10-fact test cannot validate 96.6% / 84.2% numbers exactly — only direction",
+          "type": "contains"
+        },
+        {
+          "name": "no_hallucinated_percentages",
+          "description": "Does not fabricate a percentage that wasn't measured — only reports measured fractions",
+          "type": "structural_accuracy"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "category": "comprehension",
+      "prompt": "Using the mempalace skill, answer these questions about how MemPalace actually works under the hood — not from docs, from implementation:\n1. What is the chunk size (in characters) that miner.py uses when splitting files into drawers? What is the overlap between chunks?\n2. How does MemPalace detect whether a file has already been mined? What specific field does it compare?\n3. The skill says AAAK currently regresses vs raw mode. What are the two specific benchmark numbers (percentages)?\n4. What is the correct flag to scope mempalace search to a specific room — not just a wing?\n5. Contradiction detection exists as fact_checker.py but is described as 'not wired in'. What does that mean practically — if you store two contradicting facts, what happens?\n6. The skill mentions a security bug in the hooks. What is it and which issue number tracks it?\n\nAnswer from the skill's documented implementation details, not general knowledge.",
+      "expected_output": "Specific numeric values for chunk size, overlap, and benchmark scores; the exact metadata field used for incremental mining; the correct CLI flag for room filtering; the practical behavior when contradicting facts are stored; and the specific security bug with its issue number.",
+      "comprehension_required": true,
+      "grepable": false,
+      "files": [],
+      "target_duration_seconds": 25,
+      "target_tokens": 500,
+      "assertions": [
+        {
+          "name": "correct_chunk_size",
+          "description": "States CHUNK_SIZE=800 (characters) and overlap=100",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "correct_mtime_check",
+          "description": "Explains file_already_mined uses source_mtime metadata field comparison",
+          "type": "contains"
+        },
+        {
+          "name": "correct_aaak_numbers",
+          "description": "States both 84.2% (AAAK) and 96.6% (raw) precisely",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "correct_room_flag",
+          "description": "Names --room flag for room-scoped search",
+          "type": "contains"
+        },
+        {
+          "name": "correct_contradiction_behavior",
+          "description": "States both facts are stored silently with no warning from any CLI or KG operation",
+          "type": "structural_accuracy"
+        },
+        {
+          "name": "names_shell_injection_bug",
+          "description": "Identifies shell injection in hooks and issue #110",
+          "type": "contains"
+        }
+      ]
+    }
+  ]
+}

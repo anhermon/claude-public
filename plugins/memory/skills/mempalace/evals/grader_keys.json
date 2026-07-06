@@ -1,0 +1,35 @@
+{
+  "notes": "Ground-truth answers for grading only. Do NOT include this file path in eval agent prompts.",
+  "keys": {
+    "1": {
+      "r_at_5_minimum": "4/5",
+      "r_at_1_target": "4/5",
+      "mine_duration_first_run_seconds_min": 60,
+      "mine_duration_first_run_seconds_max": 180,
+      "notes": "First run downloads all-MiniLM-L6-v2 ONNX model (~79MB). 90-120s is expected. R@5 should be high given verbatim storage + semantic search."
+    },
+    "2": {
+      "expected_token_estimate_chars_per_4": true,
+      "claimed_tokens": 170,
+      "within_2x_of_170_passes": true,
+      "output_format": "plain text (no AAAK unless compress was run)",
+      "notes": "SKILL.md claims ~170 tokens for minimal palace. --help claims 600-900 for full palace. Both are correct at different scales."
+    },
+    "3": {
+      "raw_r5_expected": "high (9-10/10 on 10 distinct facts)",
+      "aaak_direction": "should regress vs raw (per benchmark: 96.6% raw vs 84.2% AAAK)",
+      "notes": "With only 10 facts the absolute numbers won't reproduce the benchmark. We test direction only."
+    },
+    "4": {
+      "chunk_size": 800,
+      "chunk_overlap": 100,
+      "incremental_field": "source_mtime",
+      "aaak_score": "84.2%",
+      "raw_score": "96.6%",
+      "room_flag": "--room",
+      "contradiction_behavior": "both facts stored silently, no warning — fact_checker.py must be invoked manually",
+      "security_bug_issue": "#110",
+      "security_bug_type": "shell injection in hooks (HOOK_NAME passed unsanitized to python subprocess)"
+    }
+  }
+}

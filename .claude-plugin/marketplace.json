@@ -79,8 +79,8 @@
     },
     {
       "name": "memory",
-      "description": "Long-term memory management using the Memory Palace (MemPalace) pattern. Persists project facts, user preferences, and session snapshots.",
-      "version": "1.0.0",
+      "description": "Long-term memory via MemPalace — verbatim semantic recall over a local ChromaDB store. Thin wrapper around the real `mempalace` CLI (pip install mempalace); nothing vendored.",
+      "version": "2.0.0",
       "author": {
         "name": "Angel Hermon"
       },

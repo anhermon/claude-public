@@ -62,13 +62,13 @@ No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
 ---
 
 ### memory
-**v1.0.0** — Long-term memory management using the Memory Palace (MemPalace) pattern.
+**v2.0.0** — Long-term memory via [MemPalace](https://github.com/MemPalace/mempalace): verbatim semantic recall over a local ChromaDB store.
 
-Persists project facts, user preferences, and session snapshots to a structured `.memory/` directory.
+Thin skill wrapper around the real `mempalace` CLI — nothing vendored, always current. Mine project files or conversation exports, then search them semantically.
 
-**Trigger phrases:** "remember this", "recall from memory", "save my preferences", "load my memory", "manage project context"
+**Trigger phrases:** "remember this", "recall from memory", "what did we decide about X", "mine this chat", "the palace", "my memories"
 
-No prerequisites. Storage defaults to `.memory/` in current project or `~/.memory/` globally.
+Requires `pip install mempalace` (first run downloads a ~79MB embedding model).
 
 ---
 
