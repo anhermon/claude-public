@@ -24,7 +24,7 @@
     {
       "name": "code-review",
       "description": "Review code for correctness, security, performance, and style. Works on staged diffs, individual files, or GitHub PRs. Returns structured findings with P0-P3 severity levels.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "Angel Hermon"
       },
@@ -178,7 +178,7 @@
     {
       "name": "review-agents",
       "description": "Full codebase review orchestrated across 9 specialized subagents (architecture, correctness, security, performance, observability, readability, contracts, data, ci) via /review.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "Angel Hermon"
       },
