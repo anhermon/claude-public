@@ -1,0 +1,11 @@
+{
+  "name": "memory",
+  "version": "1.0.0",
+  "description": "Long-term memory management. MemPalace (verbatim semantic recall via a local ChromaDB store) plus PARA memory files (compact curated working memory: preferences, project facts, current state, weekly synthesis). Persists to a structured `.memory/` directory.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["memory", "mempalace", "para", "persistence", "knowledge"],
+  "skills": [
+    "./skills/mempalace",
+    "./skills/para-memory-files"
+  ]
+}

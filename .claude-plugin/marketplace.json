@@ -1,8 +1,7 @@
 {
   "name": "claude-public",
   "owner": {
-    "name": "Angel Hermon",
-    "email": "anhermon@users.noreply.github.com"
+    "name": "Angel Hermon"
   },
   "metadata": {
     "description": "Public Claude Code plugins — conventional commits, code review, AI image generation, large codebase search, and persistent knowledge management"

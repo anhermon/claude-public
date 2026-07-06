@@ -5,10 +5,17 @@ description: AutoResearchClaw sub-skill — run the 23-stage autonomous research
 
 # ResearchClaw
 
-Thin wrapper. Full instructions live at:
-`/Users/angelhermon/.paperclip/instances/AutoResearchClaw/.claude/skills/researchclaw/SKILL.md`
+Thin Claude Code wrapper around [AutoResearchClaw](https://github.com/aiming-lab/AutoResearchClaw) — a 23-stage autonomous research pipeline ("Chat an Idea. Get a Paper."). Not vendored here; this skill drives a local checkout.
 
-Read it for pipeline stages, flags, output structure, and troubleshooting.
+## Setup (first time on a machine)
+
+```bash
+export RESEARCHCLAW_DIR="${RESEARCHCLAW_DIR:-$HOME/workspace/AutoResearchClaw}"
+[ -d "$RESEARCHCLAW_DIR" ] || git clone https://github.com/aiming-lab/AutoResearchClaw "$RESEARCHCLAW_DIR"
+cd "$RESEARCHCLAW_DIR" && python3 -m venv .venv && source .venv/bin/activate && pip install -e .
+```
+
+Read `$RESEARCHCLAW_DIR/.claude/skills/researchclaw/SKILL.md` (if present in the upstream repo) for the authoritative pipeline stages, flags, and output structure — it supersedes this file if they disagree.
 
 ---
 
@@ -16,24 +23,22 @@ Read it for pipeline stages, flags, output structure, and troubleshooting.
 
 ### 1. Pre-warm session (required on first run)
 
-`acpx` sessions hang on cold start — always warm before running the pipeline:
+If you're driving the pipeline through `acpx` (Paperclip's session-multiplexing proxy) rather than directly, sessions hang on cold start — always warm before running the pipeline:
 
 ```bash
-acpx --ttl 0 --cwd /Users/angelhermon/.paperclip/instances/AutoResearchClaw \
-  claude sessions ensure --name researchclaw 2>/dev/null || \
-acpx --ttl 0 --cwd /Users/angelhermon/.paperclip/instances/AutoResearchClaw \
-  claude sessions new --name researchclaw
+acpx --ttl 0 --cwd "$RESEARCHCLAW_DIR" claude sessions ensure --name researchclaw 2>/dev/null || \
+acpx --ttl 0 --cwd "$RESEARCHCLAW_DIR" claude sessions new --name researchclaw
 
-acpx --approve-all --max-turns 1 --ttl 0 \
-  --cwd /Users/angelhermon/.paperclip/instances/AutoResearchClaw \
-  claude -s researchclaw \
+acpx --approve-all --max-turns 1 --ttl 0 --cwd "$RESEARCHCLAW_DIR" claude -s researchclaw \
   "You are a research assistant. Respond with text only. Do NOT use any tools. Acknowledge with 'Ready'."
 ```
+
+`acpx` is optional — skip this step entirely if you're not running under Paperclip.
 
 ### 2. Run the pipeline
 
 ```bash
-cd /Users/angelhermon/.paperclip/instances/AutoResearchClaw
+cd "$RESEARCHCLAW_DIR"
 source .venv/bin/activate
 researchclaw run --topic "$TOPIC" --config config.arc.yaml
 ```

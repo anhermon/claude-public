@@ -5,16 +5,20 @@ description: Skill for efficiently searching and ingesting large codebases using
 
 # Agent Repository Search & Ingest Skill
 
-This skill enables an inference agent to interact with a repository that has been processed by the internal `rendergit` tool. 
+This skill enables an inference agent to interact with a repository that has been processed by [`rendergit`](https://github.com/karpathy/rendergit) (Andrej Karpathy, 0BSD license) — a tool that flattens a GitHub repo into a single static HTML page plus structural/CXML chunks for fast, token-efficient skimming.
 
 ## Preparation: Ingesting a Repository
-If the user provides a repository URL that has not yet been ingested, or if you need fresh context, you MUST first run the ingestion tool located within this plugin:
+
+This plugin does not vendor `rendergit` — it always fetches the current version from upstream so you get fixes/improvements automatically. If the user provides a repository URL that has not yet been ingested, or if you need fresh context, fetch and run it directly:
 
 ```bash
-uv run --project $(dirname $(dirname $(dirname $SKILL_PATH))) python $(dirname $(dirname $(dirname $SKILL_PATH)))/rendergit.py <REPO_URL> -o <OUTPUT_DIR>
+CACHE=~/.cache/rendergit/rendergit.py
+mkdir -p "$(dirname "$CACHE")"
+curl -fsSL https://raw.githubusercontent.com/karpathy/rendergit/main/rendergit.py -o "$CACHE"
+uv run --with markdown --with pygments --with tiktoken --with openai python "$CACHE" <REPO_URL> -o <OUTPUT_DIR>
 ```
 
-(Note: `$SKILL_PATH` is the environment variable pointing to this markdown file). Use a consistent `<OUTPUT_DIR>` (e.g., `repo_context/`) to store the resulting `index.txt` and `.cxml` chunks.
+Re-run the `curl` step periodically (e.g. once per session) to pick up upstream changes — don't cache indefinitely. Use a consistent `<OUTPUT_DIR>` (e.g., `repo_context/`) to store the resulting `index.txt` and `.cxml` chunks.
 
 ## Standard Workflow
 

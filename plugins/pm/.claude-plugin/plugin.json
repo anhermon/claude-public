@@ -1,0 +1,19 @@
+{
+  "name": "pm",
+  "version": "1.0.0",
+  "description": "BMAD Project Manager — orchestrate software projects through the full BMAD lifecycle: Ideation → PRD → Architecture → Stories → Implementation → QA → Integration. Claude Code trigger skills over the BMAD-METHOD agent framework.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["pm", "bmad", "project-management", "orchestration"],
+  "skills": [
+    "./skills/pm",
+    "./skills/analyst",
+    "./skills/pm-product-manager",
+    "./skills/pm-architect",
+    "./skills/pm-scrum-master",
+    "./skills/pm-developer",
+    "./skills/pm-qa",
+    "./skills/pm-qa-spec",
+    "./skills/pm-qa-quality",
+    "./skills/pm-orchestrator"
+  ]
+}

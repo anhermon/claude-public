@@ -16,7 +16,7 @@ A production-ready FastAPI telemetry server for tracking events, sessions, and m
 ### Installation
 
 ```bash
-cd /Users/angelhermon/.paperclip/instances/telemetry-backend
+cd <BACKEND_DIR>
 pip install -r requirements.txt
 ```
 

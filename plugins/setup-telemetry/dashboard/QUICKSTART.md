@@ -11,7 +11,7 @@ Get the telemetry dashboard running in 60 seconds.
 
 ```bash
 # 1. Navigate to project
-cd /Users/angelhermon/.paperclip/instances/telemetry-dashboard
+cd <DASHBOARD_DIR>
 
 # 2. Install dependencies
 npm install

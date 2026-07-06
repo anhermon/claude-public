@@ -4,7 +4,7 @@
 
 **Start server:**
 ```bash
-cd /Users/angelhermon/.paperclip/instances/telemetry-dashboard
+cd <DASHBOARD_DIR>
 npm install
 npm run dev
 ```

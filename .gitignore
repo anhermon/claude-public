@@ -2,4 +2,5 @@
 logs/
 wiki.html
 .DS_Store
-**/ .DS_Store
+**/.DS_Store
+.claude/settings.local.json

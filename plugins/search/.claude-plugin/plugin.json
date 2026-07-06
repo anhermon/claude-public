@@ -1,0 +1,11 @@
+{
+  "name": "search",
+  "version": "1.0.0",
+  "description": "Precise codebase exploration using ripgrep and tree-sitter. Finds definitions, call sites, and usages with structural awareness. Faster and more precise than default search for large codebases.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["search", "ripgrep", "tree-sitter", "codebase-exploration"],
+  "skills": [
+    "./skills/code-search",
+    "./skills/explore"
+  ]
+}
