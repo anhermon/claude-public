@@ -1,6 +1,7 @@
 ---
-description: Full codebase review using 9 specialized subagents (architecture, correctness, security, performance, observability, readability, contracts, data, ci). Use /review for a complete cross-domain report, or /review --domain security to target a single domain. Usage /review [--type backend|microservice|frontend] [--scope paths] [--domain DOMAIN]
+description: Deep full-codebase review using 9 specialized subagents (architecture, correctness, security, performance, observability, readability, contracts, data, ci). ONLY for explicit /review invocation or an explicit "full codebase review" / "audit the whole codebase" request — for ordinary "review this/my changes" requests use the code-review skill instead. Usage /review [--type backend|microservice|frontend] [--scope paths] [--domain DOMAIN]
 argument-hint: "[--type TYPE] [--scope PATHS] [--domain DOMAIN]"
+disable-model-invocation: true
 ---
 
 # Code Review Orchestrator

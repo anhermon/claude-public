@@ -188,6 +188,20 @@
         "path": "plugins/review-agents",
         "ref": "main"
       }
+    },
+    {
+      "name": "observability",
+      "description": "Observability skills — query Loki logs, Prometheus metrics, Tempo traces, Grafana dashboards, and analyze error patterns across a multi-agent system",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/observability",
+        "ref": "main"
+      }
     }
   ]
 }

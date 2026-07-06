@@ -149,6 +149,15 @@ No prerequisites.
 
 ---
 
+### observability
+**v1.0.0** — Query Loki logs, Prometheus metrics, Tempo traces, and Grafana dashboards; analyze error patterns across a multi-agent system.
+
+**Trigger phrases:** "query loki", "check prometheus metrics", "trace this request", "error patterns across agents"
+
+Requires access to a Loki/Prometheus/Tempo/Grafana stack.
+
+---
+
 ## Development Philosophy
 
 **Purpose:** This repo hosts claude plugins marketplace — improved dev tooling and a learning knowledge base. Plugins here are not context-specific and aim to be useful to any Claude Code user.

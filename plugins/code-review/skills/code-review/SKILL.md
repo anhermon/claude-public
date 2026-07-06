@@ -1,11 +1,14 @@
 ---
 name: code-review
 description: >
-  Review code for correctness, security, performance, and style. Trigger on: "review",
+  Fast single-pass code review for correctness, security, performance, and style.
+  This is the DEFAULT reviewer for any unqualified review request. Trigger on: "review",
   "code review", "review this", "review my code", "review the diff", "review my PR",
-  "review changes", "/code-review", "look at my code", "check my code", "audit this".
+  "review changes", "/code-review", "look at my code", "check my code".
   Reviews staged changes, a specific file, a diff, or a PR. Returns structured findings
-  with severity levels and actionable fix suggestions.
+  with severity levels and actionable fix suggestions. For a deep multi-domain audit of
+  an entire codebase, the user must explicitly invoke /review (review-agents plugin) —
+  do not escalate there on your own.
 metadata:
   version: "1.0.0"
   author: "Angel Hermon"
