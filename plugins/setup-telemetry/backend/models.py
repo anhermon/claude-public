@@ -13,6 +13,10 @@ class EventType(str, enum.Enum):
     PostToolUse = "PostToolUse"
     SessionEnd = "SessionEnd"
     Stop = "Stop"
+    SubagentStop = "SubagentStop"
+    Notification = "Notification"
+    UserPromptSubmit = "UserPromptSubmit"
+    PreCompact = "PreCompact"
 
 
 class Event(Base):

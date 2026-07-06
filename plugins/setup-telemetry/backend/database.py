@@ -5,7 +5,11 @@ from sqlalchemy import create_engine, func, desc
 from sqlalchemy.orm import sessionmaker, Session
 from models import Base, Event, EventType, Session as SessionModel
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./telemetry.db")
+# Default to a data dir outside the plugin source tree — a DB in the repo
+# working tree gets clobbered by git operations while the server holds it open.
+_default_db_dir = os.path.expanduser("~/.claude/telemetry")
+os.makedirs(_default_db_dir, exist_ok=True)
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{_default_db_dir}/telemetry.db")
 
 # Create engine with SQLite-specific settings
 engine = create_engine(
