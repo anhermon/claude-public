@@ -2,7 +2,8 @@
 // logged-in Chrome. Trackers are blocked BEFORE the first navigation.
 // Usage: node chrome-shot.mjs <url> <outdir> [widths=1440,390]
 //   env: RM=1 (prefers-reduced-motion), SCHEME=light|dark, STEPS=n (max viewport shots per width, default 10),
-//        MODE=tool (with EVAL=scripts/tells.js: score a dense tool UI by references/wow.md "Tool mode"; default marketing),
+//        MODE=app (alias: tool) | marketing (default): the tells.js profile. Step 0 gate: NOTES.md must hold a "## Step 0 classification" section (scripts/classify.py, PW_NOTES=<path> or
+//          NOTES.md in the out dir's ancestors / cwd) whose mode equals MODE, else exit 4 and nothing runs. Only EVAL=measure-site.js (measuring OTHER sites' references, step 2) is exempt.
 //        EVAL=<file.js> (evaluate a script, e.g. measure-site.js, and save its result; SUMMARY=1 asks measure-site.js for its short form), SHOTS=0 (checks only)
 //        SECTIONS=1 (or a selector; default "main > section, footer"): one dir per section in <outdir>/sections/<nn-id>/,
 //          files <width>[-pN].png (tall sections split per viewport, max 3). Fixed and sticky headers hidden (WOW scroll offset = measured header height), reveals settled (waits for finite animations to finish, cap 5s).
@@ -13,8 +14,9 @@
 //        for a [data-scene], beat 1 + each beat boundary at 250/700ms + the end (8 frames for 4 beats) -> sections/wow/<width>-tN.png (RM=1: <width>-rm-tN.png)
 //          (with RM=1 they are named <width>-rm-tN.png: run once without and once with RM=1 so the critic sees the fallback)
 // Writes <outdir>/<w>-NN.png (one per viewport while scrolling like a visitor) and <outdir>/report.json.
+// Exit codes: 4 = classification missing/invalid (no Chrome started); 2 = usage / Chrome would not start; 1 = problems below; 0 = clean.
 // Exit code 1 if any width has horizontal scroll, tells.js craft_fail or no tells.js desktop verdict (UNVERIFIED), page errors, failed fonts or a custom font that never rendered.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -25,6 +27,13 @@ const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Conte
 const BLOCK = ["*posthog*", "*googletagmanager*", "*google-analytics*", "*plausible.io*", "*segment.io*", "*mixpanel*", "*hotjar*", "*clarity.ms*"];
 const STEPS = +(process.env.STEPS || 10);
 fs.mkdirSync(out, { recursive: true });
+const MODE = process.env.MODE === "tool" ? "app" : process.env.MODE || "marketing"; // tool is the old name of app
+let CLASS = null; // step 0 classification (scripts/classify.py): injected into tells.js as window.__TELLS_CLASS
+if (!/measure-site/.test(process.env.EVAL || "")) {
+  const r = spawnSync("python3", [path.join(path.dirname(new URL(import.meta.url).pathname), "classify.py"), "--mode", MODE, "--from", path.resolve(out), "--json"], { encoding: "utf8" });
+  if (r.status !== 0) { console.error(r.stderr || "CLASSIFICATION REQUIRED: classify.py did not run (python3 missing?)"); process.exit(r.status === 4 ? 4 : 2); }
+  CLASS = JSON.parse(r.stdout);
+}
 let tellsDesktop = false;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -140,7 +149,7 @@ for (const w of ws.split(",").map(Number)) {
   let evalResult;
   if (process.env.EVAL) { // scan a fully revealed page: scroll-reveals left at opacity 0 read as "no media" (Plumb r7 false tells after the WOW reload)
     await evaluate(`(async () => { document.documentElement.style.scrollBehavior = 'auto'; for (let y = 0; y < document.documentElement.scrollHeight; y += innerHeight * 0.6) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); } await new Promise((r) => setTimeout(r, 900)); scrollTo(0, 0); })()`);
-    evalResult = await evaluate((process.env.SUMMARY ? "window.__SUMMARY = true;\n" : "") + (process.env.MODE ? `window.__TELLS_MODE = ${JSON.stringify(process.env.MODE)};\n` : "") + fs.readFileSync(process.env.EVAL, "utf8"));
+    evalResult = await evaluate((process.env.SUMMARY ? "window.__SUMMARY = true;\n" : "") + `window.__TELLS_MODE = ${JSON.stringify(MODE)};\nwindow.__TELLS_CLASS = ${JSON.stringify(CLASS && { mode: MODE, classification: CLASS.classification, density_target: parseInt(CLASS.density_target) || 0 })};\n` + fs.readFileSync(process.env.EVAL, "utf8"));
   }
   const problems = [];
   if (process.env.EVAL && /tells/.test(process.env.EVAL)) { // a gate that did not run, or ran and failed, must not leave exit 0
