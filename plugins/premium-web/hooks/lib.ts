@@ -6,6 +6,11 @@ export const DEFAULT_COUNT = 3
 export const MAX_COUNT = 6
 export const ID_RE = /^[a-z0-9-]{1,32}$/
 
+export const MAX_TASKS = 8
+// App mode: one entry per primary task, measured on the working prototype. steps is a count (clicks+keys) or a short
+// string such as "3 clicks, 1 key, 1.8s to first result".
+export type Task = { task: string; steps: number | string; result: string; screenshot?: string }
+
 export type Candidate = {
   id: string
   label: string
@@ -15,8 +20,9 @@ export type Candidate = {
   screenshot?: string // absolute, inside cwd, .png
   scores: Record<string, string | number>
   notes: string
+  tasks?: Task[] // absent for marketing candidates
 }
-export type Manifest = { brief: string; round: number; candidates: Candidate[] }
+export type Manifest = { brief: string; round: number; mode?: 'marketing' | 'app'; candidates: Candidate[] }
 export type Checked = { ok: true; manifest: Manifest } | { ok: false; error: string }
 
 // candidateCount from userConfig: integer 1..6, default 3.
@@ -115,9 +121,29 @@ export function validateManifest(text: string, cwd: string): Checked {
           else throw new Error(at + 'score "' + k + '" must be a number or a string up to 200 characters')
         }
       }
+      if (c.tasks !== undefined) {
+        if (!Array.isArray(c.tasks) || c.tasks.length > MAX_TASKS) throw new Error(at + 'tasks must be a list of up to ' + MAX_TASKS)
+        out.tasks = c.tasks.map((t: Record<string, unknown>, j: number): Task => {
+          const tat = at + 'tasks[' + j + '].'
+          if (typeof t !== 'object' || t === null || Array.isArray(t)) throw new Error(tat + ' must be an object')
+          const steps = t.steps
+          if (typeof steps === 'number') {
+            if (!Number.isInteger(steps) || steps < 0 || steps > 9999) throw new Error(tat + 'steps must be an integer 0-9999 or a short string')
+          } else if (typeof steps !== 'string' || steps === '' || steps.length > 100) throw new Error(tat + 'steps must be an integer 0-9999 or a string up to 100 characters')
+          const task: Task = { task: str(t.task, 200, tat + 'task', true), steps, result: str(t.result, 300, tat + 'result') }
+          if (t.screenshot !== undefined && t.screenshot !== '') {
+            const s = resolveInside(cwd, t.screenshot)
+            if (s === null || !/\.png$/i.test(s)) throw new Error(tat + 'screenshot must be a .png inside the project folder')
+            task.screenshot = s
+          }
+          return task
+        })
+      }
       return out
     })
-    return { ok: true, manifest: { brief: str(raw.brief, 2000, 'brief'), round, candidates } }
+    const mode = raw.mode
+    if (mode !== undefined && mode !== 'marketing' && mode !== 'app') throw new Error('mode must be "marketing" or "app"')
+    return { ok: true, manifest: { brief: str(raw.brief, 2000, 'brief'), round, ...(mode !== undefined ? { mode } : {}), candidates } }
   } catch (err) {
     return { ok: false, error: 'candidates.json: ' + (err instanceof Error ? err.message : String(err)) }
   }
@@ -129,6 +155,14 @@ export function scoresMarkdown(c: Candidate): string {
   if (keys.length > 0) lines.push(keys.map((k) => '**' + k + '** ' + c.scores[k]).join(' · '))
   if (c.notes !== '') lines.push(c.notes)
   return lines.join('\n\n')
+}
+
+// Chat/pane text for one candidate's measured tasks; '' when it has none.
+export function tasksMarkdown(c: Candidate): string {
+  if (c.tasks === undefined || c.tasks.length === 0) return ''
+  return c.tasks
+    .map((t) => '- **' + t.task + '**: ' + (typeof t.steps === 'number' ? t.steps + ' steps' : t.steps) + (t.result !== '' ? ' → ' + t.result : ''))
+    .join('\n')
 }
 
 export function pickMessage(m: Manifest, c: Candidate): string {

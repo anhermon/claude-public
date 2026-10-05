@@ -213,3 +213,26 @@ test('a local candidate is served on 127.0.0.1 only and one server is reused', a
   expect(env.spawned[0].argv.join(' ')).not.toContain('0.0.0.0')
   await ui.unmount()
 })
+
+test('app-mode candidate shows tasks with step counts and task end-state shots; marketing candidates unchanged', async ($, on) => {
+  const app = JSON.stringify({
+    brief: 'Run console',
+    mode: 'app',
+    candidates: [
+      { id: 'a', label: 'Alpha', direction: 'Table-first', dir: 'sites/a', tasks: [{ task: 'Triage a failed run', steps: 4, result: 'cause visible', screenshot: 'shots/a-t1.png' }] },
+      { id: 'b', label: 'Beta', direction: 'Marketing-style', dir: 'sites/b' },
+    ],
+  })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    stubs(on, app)
+    await $.command.run({ command: 'candidates', args: '' })
+    const ui = await $.ui.mount({ ...PANE, surface })
+    expect(await ui.find({ type: 'Markdown', text: /Triage a failed run.*4 steps/ })).toBeDefined()
+    if (surface === 'terminal') expect(await ui.find({ key: 'task-shot-a-0' })).toBeDefined()
+    else expect(await ui.find({ type: 'Text', text: /^Task shot: \/proj\/shots\/a-t1\.png$/ })).toBeDefined()
+    await ui.press({ key: 'tab-b' })
+    expect(await ui.find({ type: 'Text', text: 'Marketing-style' })).toBeDefined()
+    expect(await ui.find({ type: 'Markdown', text: /Tasks/ })).toBeUndefined()
+    await ui.unmount()
+  }
+})

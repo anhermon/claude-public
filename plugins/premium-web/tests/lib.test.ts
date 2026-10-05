@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { clampCount, openArgv, resolveInside, validateManifest } from '../hooks/lib.ts'
+import { clampCount, openArgv, resolveInside, tasksMarkdown, validateManifest } from '../hooks/lib.ts'
 
 const CWD = '/proj'
 const good = (over: Record<string, unknown> = {}) =>
@@ -66,4 +66,30 @@ test('browser command per OS', () => {
   expect(openArgv('Darwin\n', 'http://x/')).toEqual(['open', 'http://x/'])
   expect(openArgv('Linux', 'http://x/')).toEqual(['xdg-open', 'http://x/'])
   expect(openArgv('', 'http://x/')[0]).toBe('cmd')
+})
+
+test('app-mode tasks are validated; marketing candidates without tasks are unchanged', () => {
+  const one = (c: Record<string, unknown>, top: Record<string, unknown> = {}) => validateManifest(JSON.stringify({ ...top, candidates: [{ id: 'a', dir: 'a', ...c }] }), CWD)
+  const plain = one({})
+  expect(plain.ok && plain.manifest.candidates[0].tasks === undefined && plain.manifest.mode === undefined).toBe(true)
+  const r = one({ tasks: [{ task: 'Triage a failed run', steps: 4, result: 'cause visible', screenshot: 'shots/a-t1.png' }, { task: 'Find a run', steps: '2 clicks, 1 key, 0.9s', result: '' }] }, { mode: 'app' })
+  expect(r.ok).toBe(true)
+  if (r.ok) {
+    expect(r.manifest.mode).toBe('app')
+    expect(r.manifest.candidates[0].tasks?.[0].screenshot).toBe('/proj/shots/a-t1.png')
+    expect(tasksMarkdown(r.manifest.candidates[0])).toBe('- **Triage a failed run**: 4 steps → cause visible\n- **Find a run**: 2 clicks, 1 key, 0.9s')
+  }
+  expect(tasksMarkdown({ id: 'a', label: 'a', direction: '', scores: {}, notes: '' })).toBe('')
+  for (const bad of [
+    { tasks: 'x' },
+    { tasks: [{ steps: 1 }] },
+    { tasks: [{ task: 't', steps: -1 }] },
+    { tasks: [{ task: 't', steps: 1.5 }] },
+    { tasks: [{ task: 't', steps: {} }] },
+    { tasks: [{ task: 't', steps: 1, screenshot: '../x.png' }] },
+    { tasks: [{ task: 't', steps: 1, screenshot: 'x.jpg' }] },
+    { tasks: [{ task: 't'.repeat(201), steps: 1 }] },
+    { tasks: Array.from({ length: 9 }, () => ({ task: 't', steps: 1 })) },
+  ]) expect(one(bad).ok).toBe(false)
+  expect(one({}, { mode: 'game' }).ok).toBe(false)
 })

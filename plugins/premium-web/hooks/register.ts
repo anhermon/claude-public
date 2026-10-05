@@ -15,6 +15,7 @@ import {
   openArgv,
   pickMessage,
   scoresMarkdown,
+  tasksMarkdown,
   validateManifest,
 } from './lib.ts'
 
@@ -321,6 +322,22 @@ export function register(on: any, options: any): void {
             : Text({ dimColor: true, children: ['Screenshot: ' + c.screenshot] }),
         )
       }
+      const tmd = tasksMarkdown(c)
+      if (tmd !== '') body.push(Markdown({ text: '**Tasks (steps measured on the prototype)**\n' + tmd }))
+      for (const [j, t] of (c.tasks ?? []).entries()) {
+        if (t.screenshot === undefined) continue
+        body.push(
+          terminal
+            ? Image({
+                key: 'task-shot-' + c.id + '-' + j,
+                source: { file: t.screenshot, format: 'png' },
+                columns: Math.max(20, Math.min(72, (e.props?.bodyColumns ?? 80) - 2)),
+                rows: 12,
+                alt: 'End state of task: ' + t.task,
+              })
+            : Text({ dimColor: true, children: ['Task shot: ' + t.screenshot] }),
+        )
+      }
       const md = scoresMarkdown(c)
       if (md !== '') body.push(Markdown({ text: md }))
       body.push(
@@ -400,7 +417,7 @@ export function register(on: any, options: any): void {
         flexDirection: 'column',
         rowGap: 1,
         children: [
-          Text({ dimColor: true, children: ['Round ' + m.round + (m.brief !== '' ? ' · ' + m.brief.slice(0, 120) : '')] }),
+          Text({ dimColor: true, children: ['Round ' + m.round + (m.mode === 'app' ? ' · app' : '') + (m.brief !== '' ? ' · ' + m.brief.slice(0, 120) : '')] }),
           tabs,
           ...body,
         ],
