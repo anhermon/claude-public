@@ -1,5 +1,7 @@
 # The signature moment ("wow")
 
+> **Marketing mode (step 0 READ).** Apps (step 0 WORK) have no wow: they are judged on signature clarity, see "App mode" below. Everything above that section is marketing only.
+
 > **v2 (2026-10-04) supersedes "Ideation procedure" below.** Why: the fixmap redesign had a real data-is-brand
 > idea (parse ELF, draw segments) and still read "basic, no wow", because (1) the idea was picked from only 3
 > candidates scored on *feasibility*, so it settled on the cheapest competent panel; (2) nothing forced it to be the
@@ -21,7 +23,7 @@
    concrete sentence about the product, not about style) plus 2 numeric checks (e.g. occupies >= 55% of the 1440 first
    viewport; first interaction produces a visible result in < 1.5 s with no click-through). Pass it to the critic:
    `critic.py <dir> --wow wow --wow-test "<sentence>"`.
-5. **Placement**: above the fold or the page's centrepiece. Pages for tool/data products: >= 50% viewport width (Stripe, Linear; the gate is 25% x 30%, see Tool mode for tool UIs where 50% x 40% is the gate); object
+5. **Placement**: above the fold or the page's centrepiece. Pages for tool/data products: >= 50% viewport width (Stripe, Linear; the marketing gate is 25% x 30%; an app has no wow gate, see App mode); object
    heroes may be smaller (approved pebble's clay stack is 26% wide) but never < 25% wide x 30% tall (tells.js `wow_visible`). It is the product itself (Stripe: the live checkout; Linear: the real app at full width), never a
    neighbour of a headline in a 400px box.
 6. **Poster first** (unchanged): reduced-motion frame states the claim alone.
@@ -36,34 +38,43 @@ checkout UI on the right 50% of the first viewport plus a full-bleed gradient we
 product itself or one rendered thing) in the first viewport, display type 4.5-5.5x body, ground changes or a bleed every
 1-2 screens, no row of equal panels above the fold.
 
-## Tool mode
+## App mode
 
-Use when the deliverable is a **tool UI** (an ops console, release board, trace viewer, dashboard-as-product), not a page that sells
-one. Why a separate mode: a dense tool has no marketing hero, so the marketing h1 guidance (about 7vw, not enforced) and "two scale-change sections below the hero" cannot be
-met by honest work, and agents answered by skipping the skill ("poor fit") and shipping the generic mockup (hero card + KPI strip +
-side panel + table), which Angel rejected as "nothing premium, out-of-the-box AI generated". Tool mode keeps the bar and moves it to
-what a tool can truthfully have. **Marketing mode and its thresholds are unchanged**; do not use tool mode for a landing page.
+Use when step 0 classified the deliverable WORK (an ops console, release board, trace viewer, deployment-history or test-run UI, admin). **This section replaces the wow for apps.**
+Marketing mode and its thresholds are unchanged; do not use app mode for a landing page, and never size-gate or spectacle-gate a work screen.
+(History: the first "tool mode" kept a wow gate for apps: a data object >= 50% x 40% of the first viewport, a 4vw display numeral and an edge-to-edge band. Real runs then
+padded tools with page structure or wrapped a hero in `data-wow` to satisfy it, and nothing measured whether the task got faster. All three size gates are gone for apps; `tool` is now an alias of `app`.)
 
-1. **The hero is the product's own data object**: a timeline of all releases, a trace of one run, a map of all N items. Drawn from a
-   real record shape (every mark is one record: its id, state, duration; legend and an honest count), never a sketch, a sparkline in a
-   card, or a KPI strip. Declared with `data-wow` on the element; `data-records="N"` if it is a canvas. tells.js counts only drawn SVG shapes (path, rect, circle, line, polyline, polygon, ellipse) and refuses a `data-wow` that is, or sits in, a table/list; `data-records` on a canvas is self-declared, so the critic must confirm from the screenshot that the marks are real records.
-2. **Minimum size**: >= 50% of viewport width and >= 40% of viewport height, starting in the first viewport at 1440, drawn from
-   >= 12 records/marks. (Marketing: 25% x 30% as the hard gate, 50% as the guidance for tool-product heroes; tool mode makes 50% the
-   gate because there is no headline competing for the first screen, so the data object must be the first screen.)
-3. **One display-scale numeral or label** (not an h1; a tool page keeps exactly one `<h1>`, a small page/view title at UI size, and the numeral is a `<p>`/`<div>` or `<output>` with `aria-label`, never a second h1): the largest text is >= 4x the median text AND >= 4vw (58px at 1440): the one
-   number the tool exists to answer ("30 in flight", "4 blocked", "p95 412ms"). Marketing guidance (not enforced; only the 4x ratio is) is an h1 or numeral near 7vw because the h1 is
-   the hero; tool mode lowers the floor to 4vw because the numeral lives inside a dense layout, but keeps the 4x ratio.
-4. **One full-bleed scale change**: one element spanning the viewport edge to edge (drawn figure, contrasting band) >= 160px tall, or
-   type >= 12vw. Marketing needs 2 below the hero; a dense single-screen tool earns 1, but edge to edge, not a card in the gutters.
-5. **Acceptance test stays mandatory** (step 4 above): "A stranger screenshotting this would say: ___" plus numeric checks, passed
-   to `critic.py --mode tool --wow wow --wow-test "..."`. KPI strip + table around a small chart scores 1-3 at the critic.
+### Signature clarity (replaces the wow; judged by the critic, validated by the walk-through)
 
-Gate: `MODE=tool EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440` and `critic.py <dir> --mode tool ...`.
-Mode-aware tells (tool mode only; marketing unchanged, test_tells.js asserts both): `equal_card_grids` skips >= 6 equal cells or cells <= 72px tall
-(repeated data/status cells; 3-5 tall equal cards still fire), `timeline_code_split` skips lists of >= 6 items (steps/runs are data), `palette` is
-one-note only with zero chromatic hues and no media (one state hue is normal). Not changed in tool mode: panel_run, the ban list, saturation limits, `wow >= 4`.
+One distinctive, **truthful** way of making the product's own data legible: all N items on one field, a timeline that is also the filter, a diff drawn as the thing itself, a run as lanes of
+spans. It may be small, quiet or a single well-made column; it must **shorten a primary task**. Procedure (write it in NOTES.md before building):
+1. **The table baseline.** What would a plain sortable table of this data give, and how many steps does each primary task take with it? (Count it; app-mode.md section 1 walk-through format.)
+2. **The sentence.** "This shows ___ as ___, which a ___ would show as a table." Concrete, about the product, not about style.
+3. **Truth.** Every mark is a real record (id, state, timestamp); sample data is labelled "sample data"; counts are honest; no invented metrics.
+4. **Validation by recorded numbers.** After the build, re-run each primary task and record steps, keystrokes and time-to-first-result. The signature earns its score only if at least one task is
+   shorter or clearer than the baseline. A pretty field that does not shorten a task is decoration (3 at best).
+5. **Do not game gates.** No `data-wow`, no hero band, no oversized numeral to satisfy a detector (`data_wow_in_app` fails the screen). If a gate asks for one, stop and report it as mismatched.
+Judged by `critic.py --mode app --signature <screen> --signature-test "<sentence>"`: signature clarity >= 4, truthful, and every flow passes. A competent sidebar + table + detail panel is the 3 "nice" ceiling.
 
-<!-- tool-mode-numbers (test_tells.js asserts these equal tells.js TH.tool): wow_w=0.5 wow_h=0.4 marks=12 display_vw=0.04 ratio=4 breaks=1 -->
+### tells.js app profile: thresholds (machine copy: `TH.app` in tells.js; the line below is asserted equal by test_tells.js)
+
+All five new checks are hard fails (they go into `craft_fail`, which fails chrome-shot with exit 1 and the critic page). The first two columns are measured at 1440x900 on a revealed page.
+
+| check | measured | threshold (hit = fail) | notes |
+|---|---|---|---|
+| `density` | rows (table rows, list items, role=row/listitem/option/treeitem, `[data-row]`, groups of >= 3 siblings) visible in the first viewport | rows < `density_target` from step 0. No target = hit with `UNVERIFIED` | screens with no list set `data-screen="form\|detail\|editor\|settings"` on `<main>` and need >= `fields` (24) visible data points instead; desktop only |
+| `interactive_affordance` | pointer-cursor or role=button/link/tab/... elements that are not natively focusable and have no `tabindex` (`unfocusable`); controls with no accessible name (`nameless`); controls under `tap` (24) px (`under_min`) | unfocusable > 0, or nameless > 0, or under_min > max(2, `small_frac` (10%) of controls) | inline text links and labelled checkboxes are exempt from the size test; any width |
+| `state_coverage` | distinct states among empty / loading / error / partial present as `data-state` hooks, `aria-busy="true"` or `[data-skeleton]` (loading) | fewer than `states` (3) of 4; each hook needs >= `state_chars` (8) characters of real message (loading may be a skeleton) | hidden hooks count (they are the designed states); the walk-through must make them reachable |
+| `page_shaped_mismatch` | signals: `hero` (h1 >= `hero_px` 56px or a `hero` element >= 40% of the viewport), `scroll_sections` (>= 3 sections >= `tall_sec` 60% viewport tall on a page >= `scroll_vh` 3 viewports), `no_shell` (no nav/tablist/toolbar/aside with >= 2 controls that is fixed/sticky, or on a page <= `shell_vh` 1.15 viewports), `closing_cta` ("get started", "book a demo", ... in the last sections, or a footer with >= 3 link columns) | >= 2 signals, or `no_shell` on a page taller than `bleed_vh` 2 viewports | message says the gate flags WRONG-MODE STRUCTURE; desktop only |
+| `data_wow_in_app` | elements (and `<html>`) carrying `data-wow` | any | `data-wow` only feeds the marketing wow gate; on an app it is detector nudging |
+
+Kept as hard fails in app mode: `equal_card_grids`, `caps_micro_labels`, `palette` (each hit goes to `craft_fail`). `material` stays a counted tell (a table-only tool has no drawn field; the critic judges distinctiveness).
+Not gated in app mode (still measured, reported with `hit:false`, `measured_hit` and `gated:false`): `type_scale`, `wow_visible`, `scale_change`, `panel_run`, and the page-rhythm tells `empty_spacing`,
+`no_fullbleed`, `mono_panels` (they score the sections of a scrolling page). Mode-aware exemptions (app only; marketing unchanged, test_tells.js asserts both): `equal_card_grids` skips >= 6 equal cells or cells
+<= 72px tall, `timeline_code_split` skips lists of >= 6 items, `palette` is one-note only with zero chromatic hues and no media.
+
+<!-- app-mode-numbers (test_tells.js asserts these equal tells.js TH.app): fields=24 tap=24 small_frac=0.1 states=3 state_chars=8 hero_px=56 scroll_vh=3 tall_sec=0.6 shell_vh=1.15 bleed_vh=2 -->
 
 ## Original procedure (still valid as the family list)
 

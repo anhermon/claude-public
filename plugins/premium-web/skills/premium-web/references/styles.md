@@ -2,8 +2,18 @@
 
 Pick ONE direction per page from the subject, not from habit. Each recipe says what carries the richness, which
 material each section needs (see imagery.md for how to make it), the wow families that fit (wow.md), and the
-failure mode that got a real page rejected. Faces are examples with character; check the banned list in
-type-systems.md and never reuse a face another concept in the same portfolio owns.
+failure mode that got a real page rejected. Recipes down to "Blueprint / engineering" are for marketing pages; the "App" recipes at the end are for apps (step 0 WORK).
+
+## Faces (the one status table; reconciles type-systems.md rules 8-9 with the recipes below)
+
+Every face a recipe or rule names has exactly one status. A recipe may only recommend a **free** face.
+
+| status | faces | rule |
+|---|---|---|
+| **banned** (new concepts) | Inter, Geist, Bricolage Grotesque, Space Grotesk, Poppins, DM Sans, Plus Jakarta Sans | type-systems.md rule 8. Verified 2026-10-05: neither skeleton ships Inter (both ship Hanken Grotesk); remaining "Inter" mentions are records of measured sites or of anhermon v4, which predates the ban |
+| **placeholder** | Hanken Grotesk (`assets/skeleton/fonts/`, used by `tokens.css` and `tokens-app.css`) | ships so an unrestyled page still renders. It is not a recommendation: a finished concept swaps it, or states in NOTES.md why it was chosen on purpose. The Swiss recipe no longer lists it |
+| **reserved** by Angel's earlier concepts (type-systems.md rule 9) | Schibsted Grotesk + IBM Plex Mono (meridian), Martian Mono + Commit Mono (ember), Fraunces + Figtree (pebble), Bodoni Moda + Instrument Sans + Sometype Mono (halcyon), Big Shoulders + Azeret Mono + Archivo (tracer) | do not reuse in a new concept **of the same portfolio**. For a different owner (client work, an unrelated product) the reservation does not apply: write "different portfolio: <owner>" in NOTES.md and use it. The recipes below name them only as the *historical* choice of that concept |
+| **free** | Familjen Grotesk, Funnel Display, Public Sans, Albert Sans, Onest, Source Sans 3, Atkinson Hyperlegible Next, Newsreader, Cormorant Garamond, Barlow Condensed; mono: Fragment Mono, JetBrains Mono, Red Hat Mono | open licence expected; confirm with `scripts/get-font.sh <fontsource-id> fonts` (it refuses anything non-open; Familjen Grotesk and Fragment Mono were run through it, the rest were not in this environment). Proprietary faces named in measured tables (SF Pro, Söhne, Recoleta, ...) are measurements, not options |
 
 ## Material by style (which visuals come from where)
 
@@ -15,8 +25,8 @@ type-systems.md and never reuse a face another concept in the same portfolio own
 | cinematic / creative | yes: full-bleed film stills, one per section, one light direction | specs tables, controls | yes: hero shader or audio-reactive |
 | editorial dark product (anhermon) | 4:5 plates with real data labels overlaid | proof figures (allowlists, diffs) | hero |
 | blueprint / engineering | no | isometric drawings, dimension lines, parts lists, revision blocks | optional |
-| tool UI: record-as-landscape (run/trace/log/inventory views) | no (screens show real data, never plates) | the whole record set drawn from its fields, annotated, with the table as evidence | no |
-| tool UI: working surface (admin, queue, editor, settings) | no | the live object and its states; real rows, real empty/error states | no |
+| app: record-as-landscape (run/trace/log/inventory views) | no (screens show real data, never plates) | the whole record set drawn from its fields, annotated, with the table as evidence | no |
+| app: working surface (admin, queue, editor, settings) | no | the live object and its states; real rows, real empty/error states | no |
 
 Code-drawn diagrams beat photos for every technical claim (the steel-slab guard lesson, imagery.md).
 
@@ -24,7 +34,7 @@ Code-drawn diagrams beat photos for every technical claim (the steel-slab guard 
 
 - Richness comes from **precision**: tabular numerals, real units, leader-line annotations, axis labels, small
   multiples, a visible 12-column grid used asymmetrically, hairlines of two weights. Never sparse sketches.
-- Type: a grotesk with real character (Schibsted Grotesk, Hanken Grotesk, Instrument Sans, Funnel Display) +
+- Type: a grotesk with real character (free: Familjen Grotesk, Funnel Display, Albert Sans; Schibsted Grotesk and Instrument Sans were meridian's and halcyon's, see Faces) +
   a mono for data only. Big numbers are part of the design.
 - Every section's visual is **a figure you could print in a report**: real-shaped sample data, labelled
   "sample data". A parsed log line with every extracted field called out; an alert timeline with its threshold;
@@ -61,14 +71,14 @@ page does at least three of these:
 
 ## Tactile consumer (pebble, approved)
 
-- Colour blocks per section (3-5 saturated-but-soft hues), big friendly display (Fraunces with SOFT/WONK, Recoleta),
+- Colour blocks per section (3-5 saturated-but-soft hues), big friendly display (pebble used Fraunces with SOFT/WONK, now reserved; Recoleta is proprietary: pick a free soft serif or rounded display),
   clay renders with one consistent light, a phone UI drawn in code with named sample data, buttons with depth.
 - Each section: one object or one interactive (slider, toggle) doing the product's real arithmetic.
 - Fails as: generic gradient blobs, stock 3D emoji, cards without objects.
 
 ## Cinematic / creative (halcyon, approved)
 
-- Dark, film-grade. Display serif with contrast (Bodoni Moda, Playfair is overused), one warm accent, film stills
+- Dark, film-grade. Display serif with contrast (halcyon used Bodoni Moda, now reserved; free: Newsreader, Cormorant Garamond; Playfair is overused), one warm accent, film stills
   with one light direction. Slow reveals (0.8-1.2s). Sound only after a click with a visible toggle.
 - Each section: a full-bleed or 4:5 still, or the rendered device. Specs as a real table.
 - Type QA: big display serifs collide (descenders into the next line, kerning gaps like "W eather"): check every
@@ -83,27 +93,31 @@ page does at least three of these:
 ## Blueprint / engineering
 
 - Cobalt-to-ink ground (not neon on black), white and pale-cyan linework, drafting grid, dimension lines, callouts,
-  parts-list tables, isometric exploded diagrams, stamped revision blocks. Condensed/technical display (Big Shoulders,
-  Archivo Narrow) + a mono for callouts.
+  parts-list tables, isometric exploded diagrams, stamped revision blocks. Condensed/technical display (free: Barlow Condensed;
+  Big Shoulders and Archivo were tracer's, see Faces) + a mono for callouts.
 
-## Tool UI: record as landscape (run, trace, log, inventory, queue views)
+## App: record as landscape (run, trace, log, inventory, queue views)
 
-For screens whose job is reading many records. Pair with SKILL.md "Application and tool UIs" and wow.md "Tool mode".
-- The hero object is the data itself: every record placed once and drawn from its own fields (a run as a lane of
-  spans scaled by duration, an inventory as a grid of cells coloured by state, a queue as items at their real age),
-  at a scale that fills the working area, with a legend and an honest count. The table sits beneath as evidence, not
-  as the design.
-- Chrome recedes: one slim top bar, no KPI tile row, no decorative card borders; groups are separated by ground
-  change, spacing and type weight, not boxes. Selecting a record opens its detail in place (same object, zoomed).
-- Density is the material: tabular numerals, real units, 12-13px data text with one 3-4x display numeral that states
-  the screen's single finding. Type: one sans family, mono only for ids/paths/values.
-- Colour: neutral ground, one signal hue plus one status hue, each meaning one thing, explained once.
+For screens whose job is reading many records (mode `app`; read app-mode.md first). Signature clarity applies (wow.md "App mode"), not a hero size.
+- The signature object is the data itself when it shortens a task: every record placed once and drawn from its own fields (a run as a lane of spans scaled by duration,
+  an inventory as a grid of cells coloured by state, a queue as items at their real age), with a legend and an honest count. The table sits beside or beneath it as evidence and as
+  the fallback, never as decoration. No rule sizes it; the walk-through justifies it.
+- Chrome recedes: one slim top bar or rail, no KPI tile row, no decorative card borders; groups are separated by ground change, spacing and type weight, not boxes. Selecting a record opens its detail in place.
+- Density is the material: tabular numerals, real units, 12-13px data text. Colour: neutral ground, one signal hue plus one status hue, each meaning one thing, explained once.
 - Fails as: hero card + stat bar + side panel + table (the attractor, genre-escape.md section 1).
 
-## Tool UI: working surface (admin, editor, settings, review queue)
+## App: working surface (admin, editor, settings, review queue)
 
-- One primary object (the thing being edited or decided) holds >= 50% of the width; controls hang off it, not beside
-  it in equal boxes. Show the object's real states: loading, empty, error, partial, over-limit.
-- A decision area states the consequence of each action in data terms ("moves 14 items, 2 fail validation") before
-  commit. Keyboard path and focus ring are part of the design.
+- One primary object (the thing being edited or decided) holds >= 50% of the width; controls hang off it, not beside it in equal boxes. Show the object's real states: loading, empty, error, partial, over-limit
+  (`data-state` hooks with real copy, the `state_coverage` gate).
+- A decision area states the consequence of each action in data terms ("moves 14 items, 2 fail validation") before commit. Keyboard path and focus ring are part of the design.
 - Fails as: a sidebar + topbar + grid of equal cards with a donut and a line chart (admin-template default).
+
+## App type (mode `app`; the numbers are checkable by `tells.js` and `rubric-app.md`)
+
+- **One sans family**, from the Faces table (free faces; open apertures and distinct I / l / 1 and 0 / O matter in an all-day tool: Atkinson Hyperlegible Next, Public Sans, Source Sans 3). Hanken Grotesk is the placeholder.
+- **Legible 12-14px**: data and controls 13-14px (12px only for secondary metadata, never below 12), line height 1.4-1.5, weight 400 for data and 500-600 for emphasis (no 300 at 12px), contrast >= 4.5:1. View titles 16-18px; nothing above 28px over data (the hierarchy axis fails it). No display numeral is required.
+- **Tabular numerals on every number**: counts, durations, sizes, timestamps, ids with digits (`font-variant-numeric: tabular-nums`), right-aligned numeric columns, units on every value, thousands separators.
+- **Mono for identifiers only**: ids, hashes, paths, branch names, commands, log lines, at about 12px beside 13px sans. Never for prose, labels, headings or whole tables (`mono_body` and the critic catch it).
+- **No uppercase micro-label overload**: sentence-case column headers and labels. At most one uppercase tracked style on a screen, used for a handful of items at most; `caps_micro_labels` is a hard fail in app mode.
+- Sentence case everywhere; relative time with the absolute time on hover/title; truncate with a tooltip, never wrap an id.

@@ -1,6 +1,8 @@
 # Premium vs placeholder: the section rubric
 
-This file is the standard. `scripts/critic.py` pastes it into the critic's prompt verbatim, so every rule here
+This file is the standard for **marketing pages (mode `marketing`, step 0 READ) only**. Apps people operate are scored by `rubric-app.md`
+(`critic.py --mode app` never pastes this file): the section visual, ban list, "could be 20 others" and wow rules below do not apply to them.
+`scripts/critic.py` pastes this file into the critic's prompt verbatim, so every rule here
 must be checkable from screenshots. Anchors live in `gallery/` (960px webp, real screenshots from our own work).
 
 ## The bar
@@ -38,8 +40,8 @@ state. Absence is not minimalism.
 
 **Craft gates (tells.js `craft_fail`, fail the page)**: >3 consecutive bordered-panel sections; fewer than 2 scale-change
 sections below the hero; largest type < 4x median; no wow object >= 25% wide x 30% tall starting in the first viewport (tells.js
-`wow_visible`; 50% wide is the guidance for tool-product heroes, wow.md Placement). Tool UIs use the Tool-mode numbers
-(references/wow.md "Tool mode", `MODE=tool`). Details and escape moves: references/genre-escape.md.
+`wow_visible`; 50% wide is the guidance for tool-product heroes, wow.md Placement). App UIs are not gated by these (references/wow.md "App mode" has the app thresholds,
+`MODE=app`). Details and escape moves: references/genre-escape.md.
 
 ## Ban list (any hit fails the section)
 
@@ -177,14 +179,11 @@ Question: **would someone screenshot this and send it to a colleague?** Score 1-
 - 1: nothing a visitor would remember.
 Pass: >= 4, and **a wow below 4 fails the whole page regardless of every other score** (a page of 4s with a wow of 3 is a polished template: fixmap r2). Judged against the page's written acceptance test (wow.md v2). The reduced-motion / poster frame must still score >= 3 on its own (the fallback is part of the work).
 
-## Tool mode (dense tool UIs; numbers in references/wow.md "Tool mode")
+## App mode (people operate it): not scored here
 
-A tool has no h1 hero, so the "wow" and the "explanatory visual" are the product's own data object: a timeline of all items, a trace,
-a map, drawn from real records (>= 50% of the viewport width, >= 40% tall, >= 12 marks, first thing seen). Scoring in this mode:
-- hero card + KPI stat strip + side panel + table (the generic AI dashboard) = distinctiveness 1-2, wow 1-3, however tidy;
-- a small gantt/sparkline inside a card = wow 3 at most ("nice" ceiling);
-- one display numeral (>= 4vw) answering the tool's question and one edge-to-edge scale change are required, as in wow.md.
-The ban list, saturation limits and `wow >= 4` are the same as for marketing pages.
+An app is not a section list: it is scored per screen and per flow by `references/rubric-app.md` (task clarity, information hierarchy, density, state coverage, interaction quality,
+distinctiveness incl. signature clarity), against the walk-through, with the app tells in references/wow.md "App mode". The ban list above ("bare hairline-and-text", "interchangeable cards",
+"decorative numbering", whitespace) was written for pages and is not applied to app screens; the app bans live in rubric-app.md. Saturation limits are shared.
 
 ## Concrete standard: what anhermon v4 does per section (measured from frontpage-v4/after shots)
 
