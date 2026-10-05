@@ -202,6 +202,20 @@
         "path": "plugins/observability",
         "ref": "main"
       }
+    },
+    {
+      "name": "premium-web",
+      "description": "Build premium, studio-quality web pages with a calibrated critic loop, mandatory signature wow moment, section-level rubric and image generation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/premium-web",
+        "ref": "main"
+      }
     }
   ]
 }
