@@ -8,6 +8,7 @@
 
 ### Changed
 
+- **premium-web 2.0.0 — now a Claude Code mod.** The skill builds several materially different candidates (default 3, `candidateCount` setting 1-6, or a number in the request) in parallel, runs one critic pass on each, and presents them in a new "Premium candidates" pane (`/candidates`, or the `premium_web_present_candidates` tool). The user browses, opens each candidate in the browser, picks one or sends feedback; the choice is written to `.premium-web/decision.json` and sent back to Claude, which then finishes only the winner through the full critic loop. A chat fallback covers Claude Code < 2.1.287, disabled mods and non-interactive runs.
 - Catalog reduced to `premium-web`, `llm-wiki`, `research`, `agent-repo-search`, `context-os`; every entry has a `category`; README rewritten with a quality bar.
 - `context-os` version aligned to 2.2.0 across marketplace.json, plugin.json and README; cc-lens default URL is now a named constant.
 - `research` gains a README and plugin.json `version`; personal path and Paperclip references removed.
@@ -16,9 +17,14 @@
 
 ### Added
 
+- premium-web: `hooks/` (mod: `register.ts`, `lib.ts`), `tests/` (`claude plugin test`), `skills/premium-web/references/candidates.md`.
 - **skill-creator-plus 0.3.0**: stage timing now comes from the executor's transcript, so the waterfall shows where wall time really goes. Model time (thinking and writing tool input) and tool time are split per stage and shown as stacked bars with output tokens; startup, handback and unattributed time are explicit and reconcile with the transcript's wall time (checked in code). Executors declare stages for free with a `# stage: <name>` first line in a Bash command (or a `stage: <name>` text line before other tools) instead of running `python3 -c` marks, which added about 3s each and ignored model time. `timing.json` records `agent_id` / `transcript_path`; `stages.jsonl` remains a fallback labelled "shell-only marks: model time not attributed".
 - `scripts/validate.sh`: validates the marketplace and all plugins.
 - **skill-creator-plus 0.2.0**: Anthropic's `skill-creator` skill (claude.ai-synced copy) as a pristine `upstream/` copy plus a locally extensible `skills/` copy, resynced with `scripts/sync-upstream.sh`. Evals measure duration per stage of the tested skill: `iteration-N/stages.json`, per-run `stages.jsonl` marks, `scripts/stage_timing.py`, a stage table in the benchmark, a waterfall chart in the viewer (with the previous iteration) and a standalone `waterfall.svg`. The improve loop and analyzer use stage timings, score first, duration second. Apache-2.0, credited to Anthropic.
+
+### Security
+
+- premium-web mod is unsandboxed. It reads/writes only `.premium-web/` in the project, serves candidate folders on 127.0.0.1 via `python3 -m http.server`, and makes no other network calls. See the plugin README.
 
 ## [0.2.3] — 2026-04-07
 

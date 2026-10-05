@@ -1,0 +1,1 @@
+{ "description": "premium-web candidates mod", "modules": ["./register.ts"] }
