@@ -30,7 +30,14 @@
       scale_change: { count: m.breaks, hit: desk && m.breaks < T.breaks },
     };
   };
-  if (typeof document === "undefined") { if (typeof module !== "undefined") module.exports = { TH, toolGates }; return; }
+  // Mode-aware exemptions (tool mode ONLY; marketing returns false/unchanged). A tool UI legitimately repeats data cells, lists steps
+  // beside a log, and colours only state (tool-ui-exemplars.md: 90 identical bars per row, 1-3 hues for state). Heuristics with a stated ceiling:
+  //  grid: >= 6 equal cells (repeated data) or compact cells <= 72px tall (status/KPI cells); 3-5 tall equal cards still fire.
+  //  split: a list of >= 6 items is data (steps, runs), not a decorative 3-5 item timeline.
+  //  palette: one state hue is the norm; only a tool with NO hue at all (and no drawn media) is one-note.
+  const toolExempt = { grid: (mode, n, cellH) => mode === "tool" && (n >= 6 || cellH <= 72), split: (mode, items) => mode === "tool" && items >= 6,
+                       paletteHit: (mode, hues, below) => (mode === "tool" ? hues === 0 : hues <= 1) && below < 2 };
+  if (typeof document === "undefined") { if (typeof module !== "undefined") module.exports = { TH, toolGates, toolExempt }; return; }
   const MODE = window.__TELLS_MODE || "marketing";
   if (MODE !== "marketing" && MODE !== "tool") return { error: "UNVERIFIED: unknown tells mode " + JSON.stringify(MODE) + " (use marketing or tool)" };
   const vis = (e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none" && +s.opacity > 0; };
@@ -54,7 +61,7 @@
     const same = boxed.filter((k) => { const r = k.getBoundingClientRect(); return Math.abs(r.width - r0.width) < 6 && Math.abs(r.height - r0.height) < 6; });
     const sameTag = same.every((k) => k.children.length === same[0].children.length);
     const hasMedia = same.some((k) => k.querySelector("img, picture, canvas, video, svg *:nth-child(6)"));
-    if (same.length >= 3 && sameTag && !hasMedia && r0.width > 160) grids.push(name(p) + " x" + same.length);
+    if (same.length >= 3 && sameTag && !hasMedia && r0.width > 160 && !toolExempt.grid(MODE, same.length, r0.height)) grids.push(name(p) + " x" + same.length);
   });
   out.equal_card_grids = { count: grids.length, examples: grids.slice(0, 5), hit: grids.length >= 1 };
 
@@ -80,7 +87,7 @@
       const v = rgb(c); if (v.length < 3 || v[3] === 0 || !w) continue; const h = hue(v); if (h !== null) hues.set(h, (hues.get(h) || 0) + w); } });
   const total = [...hues.values()].reduce((a, b) => a + b, 0) || 1, used = [...hues.entries()].filter(([, w]) => w / total > 0.04);
   const bgL = (() => { const v = rgb(getComputedStyle(document.body).backgroundColor); return v.length ? (v[0] + v[1] + v[2]) / 765 : 1; })();
-  out.palette = { chromatic_hues: used.length, body_bg_lightness: +bgL.toFixed(2), hit: used.length <= 1 }; // revised below
+  out.palette = { chromatic_hues: used.length, body_bg_lightness: +bgL.toFixed(2), hit: false }; // set below, once media is counted
 
   // 5. Material: raster/vector/canvas visuals >= 200px outside the first section (photo, render, illustration, WebGL).
   const media = [...document.querySelectorAll("img, canvas, video, svg, body *")].filter((m) => { const r = m.getBoundingClientRect();
@@ -88,7 +95,7 @@
   const below = media.filter((m) => !sections[0] || !sections[0].contains(m));
   out.material = { media_total: media.length, below_hero: below.length, hit: below.length === 0 };
   // one-note = single accent hue AND (almost) no images/renders/canvas to carry colour and depth (halcyon: gold on black + film imagery passes)
-  out.palette.hit = out.palette.hit && below.length < 2;
+  out.palette.hit = toolExempt.paletteHit(MODE, used.length, below.length);
 
   // 6. Empty spacing: per section, share of a 16x10 sample grid covered by a text line, media, or a coloured box.
   const cover = sections.map((s) => { const sr = s.getBoundingClientRect(), sbg = getComputedStyle(s).backgroundColor;
@@ -122,7 +129,7 @@
   out.mono_panels = { sections_with_panel: panelSecs.length, hit: sections.length >= 3 && panelSecs.length / sections.length >= 0.6 };
 
   // 11. Timeline list beside a mono command panel (ember r2 revisions: "looks bad").
-  const split = sections.filter((sec) => { const lists = [...sec.querySelectorAll("ol, ul")].filter((l) => vis(l) && l.children.length >= 3 && !l.closest("nav"));
+  const split = sections.filter((sec) => { const lists = [...sec.querySelectorAll("ol, ul")].filter((l) => vis(l) && l.children.length >= 3 && !l.closest("nav") && !toolExempt.split(MODE, l.children.length));
     const panels = [...sec.querySelectorAll("pre, div, figure")].filter(panel);
     return lists.some((l) => { const a = l.getBoundingClientRect(); return panels.some((p) => { if (p.contains(l) || l.contains(p)) return false; const b = p.getBoundingClientRect();
       return Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > Math.min(a.height, b.height) * 0.4 && (b.left >= a.right - 4 || a.left >= b.right - 4); }); }); });

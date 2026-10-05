@@ -1,0 +1,34 @@
+/* Tool-mode tokens: LIGHT is the default and the only theme unless you add one (a tool is judged on the screen the user
+   opens, not the OS scheme). Load INSTEAD of tokens.css for a tool UI (SKILL.md "Tool mode"); same variable names, so
+   site.css / form.css keep working. Restyle: swap --paper/--ink/--accent for your subject (the acceptance run used
+   paper #F2F3F0, ink #14181B, vermilion fail, teal selection). Colour is for STATE only: --ok/--warn/--fail plus ONE
+   --accent for selection; chromatic hues in view <= 3 (tool-ui-exemplars.md), hot-pixel share < 2% (saturation.py).
+   Every --text/--dim/--faint pair below is >= 4.5:1 on --bg and --surface. Add a dark island with `.theme-dark` only
+   where the product needs it (e.g. a log drawer); it keeps its own tokens regardless of the page theme. */
+:root {
+  color-scheme: light;
+  --bg: #F4F5F2; --surface: #ECEEE9; --surface-2: #E1E4DE;
+  --text: #14181B; --dim: #46505A; --faint: #5B656E;      /* --faint is the contrast floor (4.5:1 on --bg) */
+  --rule: rgba(20, 24, 27, .12); --rule-2: rgba(20, 24, 27, .22);
+  --accent: #17706A; --on-accent: #FFFFFF;                /* selection / playhead only */
+  --ok: #1E7A45; --warn: #8A5A00; --fail: #B8331F; --err: var(--fail); /* state only, never decoration; --err kept for form.css */
+  --btn-bg: #14181B; --btn-fg: #FFFFFF; --btn-hover: #000000;
+  --header-bg: rgba(244, 245, 242, .85);
+
+  --sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; /* ids, paths, logs only */
+
+  /* tool scale: UI 12-14px, ONE display numeral (>= 4x median text and >= 4vw; tells.js tool gate) */
+  --fs-ui: 13px; --fs-small: 12px; --fs-body: 14px; --lh-body: 1.45; --tr-body: 0;
+  --fs-h2: 16px; --fs-h3: 14px;
+  --fs-numeral: clamp(56px, 6.1vw, 96px);                 /* the one answer the tool exists to give; a <p>/<div>, not a 2nd h1 */
+  --gut: clamp(16px, 2.5vw, 32px);
+  --r: 4px; --r-lg: 6px;
+  --ease: cubic-bezier(.2, 0, 0, 1);
+}
+.theme-dark { color-scheme: dark; --bg: #14181B; --surface: #1B2024; --surface-2: #232A2F; --text: #EEF0EC; --dim: #A9B1B8; --faint: #8D96A0;
+  --rule: rgba(255, 255, 255, .1); --rule-2: rgba(255, 255, 255, .18); --accent: #5FC4BB; --fail: #FF8F7E; --ok: #7BD88F; --warn: #E8B34F; }
+
+html { background: var(--bg); }
+body { background: var(--bg); color: var(--text); } /* explicit: never rely on the UA canvas colour */
+.theme-dark { color: var(--text); background: var(--bg); }

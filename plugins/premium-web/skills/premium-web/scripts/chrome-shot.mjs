@@ -7,6 +7,8 @@
 //        SECTIONS=1 (or a selector; default "main > section, footer"): one dir per section in <outdir>/sections/<nn-id>/,
 //          files <width>[-pN].png (tall sections split per viewport, max 3). Fixed and sticky headers hidden (WOW scroll offset = measured header height), reveals settled (waits for finite animations to finish, cap 5s).
 //          Feed the dir to critic.py.
+//        WOW_DELAY=<ms>: shift every time frame later (default 0). Frames are clocked from the scroll-to-wow, and a scroll-reveal (.6s + --i*60ms stagger) is
+//        still moving at 250-500ms, so for a wow that reveals on scroll set WOW_DELAY ~ 600 + 60*maxStagger (e.g. 900) so t1 is post-reveal; for load/WOW_ACT animations leave 0.
 //        WOW=<selector>: reload, scroll to it, take 7 mid-animation frames (0.25-4.5s; after WOW_ACT=<js> if set) or,
 //        for a [data-scene], beat 1 + each beat boundary at 250/700ms + the end (8 frames for 4 beats) -> sections/wow/<width>-tN.png (RM=1: <width>-rm-tN.png)
 //          (with RM=1 they are named <width>-rm-tN.png: run once without and once with RM=1 so the critic sees the fallback)
@@ -108,7 +110,7 @@ for (const w of ws.split(",").map(Number)) {
     const sc = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(process.env.WOW)}); if (!e || !e.matches('[data-scene]') || e.classList.contains('is-static')) return null; const b = e.getBoundingClientRect(); return { top: b.top + scrollY, span: Math.max(0, b.height - innerHeight), steps: e.querySelectorAll('.scene-step').length || 4 }; })()`);
     // WOW_ACT=<js> starts an interaction (click, replay, drag) and then frames are time-spaced from that moment.
     // Frames are MID-ANIMATION on purpose: polish is judged in motion, not at rest (ember r2 Rail lesson).
-    let N; const act = process.env.WOW_ACT, times = [250, 500, 800, 1200, 1800, 2700, 4500]; N = process.env.RM === "1" ? 2 : times.length;
+    let N; const act = process.env.WOW_ACT, times = [250, 500, 800, 1200, 1800, 2700, 4500].map((x) => x + (+process.env.WOW_DELAY || 0)); N = process.env.RM === "1" ? 2 : times.length;
     // scroll scene: beat 1 at rest, then every beat boundary caught twice mid-transition (250ms, 700ms), then the end
     // at rest. Evenly spaced positions landed on settled beats and never showed the payoff transition (sealref r7).
     const plan = sc && !act && process.env.RM !== "1" ? [[0, 1600]].concat([...Array(sc.steps - 1)].flatMap((_, i) => [[(i + 1) / sc.steps + 0.01, 250], [null, 450]]), [[1, 1600]]) : null;
@@ -156,7 +158,7 @@ for (const w of ws.split(",").map(Number)) {
   problems.forEach((p) => console.log("   - " + p));
 }
 if (process.env.EVAL && /tells/.test(process.env.EVAL) && !tellsDesktop) { console.log("UNVERIFIED: tells.js desktop gates (type_scale, wow_visible, scale_change) did not run: include a width >= 1000 (e.g. 1440)"); failed = true; }
-fs.writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
+fs.writeFileSync(`${out}/${process.env.RM === "1" ? "report-rm" : "report"}.json`, JSON.stringify(report, null, 2)); // RM=1 must never overwrite the gate-2 report.json (critic.py reads its eval)
 sock.close(); chrome.kill();
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 console.log(`report: ${out}/report.json  — now OPEN every PNG and look at it.`);

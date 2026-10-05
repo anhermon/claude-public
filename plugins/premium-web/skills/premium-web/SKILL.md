@@ -31,6 +31,17 @@ pasted into NOTES.md and the reply.** "It renders, the clicks work" is gate 1 on
 for critic.py, exit code 3) is reported as `UNVERIFIED: <gate>: <reason>`. Never write "pass", never say the page is
 premium, never substitute functional checks or your own opinion for it. Fix the cause or hand the gate to the user.
 
+**Time box and what to do when it runs out.** A full run (read all references, 5+ wow candidates, build, 3 gates, several critic
+rounds) does not fit 60 minutes; critic.py alone is 5-20 min per round (its docstring). If the user gives a box:
+- Plan the gates first: gate 3 is required, so reserve its rounds before polishing. Run critic.py in the background and tail stderr.
+- Steps that need the network or the Simulator (`shoot.sh` real Mobile Safari, `lighthouse.sh`, image providers, font downloads) and
+  cannot run: write `UNVERIFIED: <step>: <reason>` (e.g. `UNVERIFIED: shoot.sh: Simulator unavailable / out of time box`) in NOTES.md and
+  the reply. Chrome-shot at 1440 + 390 is gate 1 evidence for what ran; it does not replace Safari, and the page is not "premium" or "done".
+- If the critic's fix list is larger than the time left, STOP and report `NOT DONE` with critic.json's failing sections and fixes. Never
+  claim done, never self-score, never skip the failing section.
+- **Gate precedence**: gates are independent and ALL required. Critic fails while tells passes: the critic wins (gate 3 fails the page
+  and exit is 1 regardless of tells; tells.js only adds failures, it never clears one). A clean tells scan means "no structural tells", not premium.
+
 ## Application and tool UIs (tool mode)
 
 Applies when the subject is a product screen, not a page that sells one: dashboard, admin, internal tool, table or
@@ -44,7 +55,7 @@ density. What changes:
 - Step 3 style: use the tool-UI recipes in styles.md. Step 4 genre: use the dashboard/run-view attractors in
   genre-escape.md. Density is a design material, not an excuse for panels.
 - The skeleton (`assets/skeleton/`) is a marketing page: for tool mode take only tokens.css, reveal.js and the font;
-  build the app shell yourself. Sections become views or regions; each still needs an explanatory visual, and the
+  build the app shell yourself (`assets/skeleton/tokens-tool.css` is the light-default tool token set: use it instead of tokens.css). Sections become views or regions; each still needs an explanatory visual, and the
   gates still run on the real screens (shoot each main view; `SECTIONS=1` where regions are `<section>`).
 - Commands: tells.js `MODE=tool EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440`; critic.py
   `MODE=tool python3 scripts/critic.py ...` or `python3 scripts/critic.py <dir> --mode tool --wow wow --wow-test "..."`.
@@ -127,6 +138,8 @@ The skeleton's h1 tops out at 72px (5vw at 1440), below genre-escape.md's 7vw gu
 your wow: adding the display-type moment and the signature object is your job, not the skeleton's.
 - Motion (motion.md): UI .15-.2s, reveals .6s cubic-bezier(.2,0,0,1) via IntersectionObserver; WebGL/scenes with
   poster fallbacks for reduced motion, Save-Data, no WebGL, context lost, slow-frame watchdog; 60fps.
+- Hiding: anything that must not be read or scored (marking slips, ghost marks, off-canvas copies, a faded duplicate layer) needs `inert`,
+  not just `aria-hidden`: Lighthouse color-contrast still measures `aria-hidden` text (`inert` removes it from the tree). Applies to dim/low-opacity slips.
 - Forms (forms.md): honeypot fully hidden (off-screen + clip + inert + aria-hidden), ~20px custom checkbox with a
   24px+ label hit area, inline errors, sending/success/error states. Never style `input` globally.
 - Trust (trust.md): proof with sources and dates, limits stated plainly, who replies; no dark patterns.
@@ -139,12 +152,14 @@ your wow: adding the display-type moment and the signature object is your job, n
 An unrunnable gate is `UNVERIFIED` (Hard rules), not a pass.
 1. **Works**: `scripts/serve.mjs` -> `scripts/shoot.sh` (Chrome 1440 + 390 and real Mobile Safari on a private
    Simulator) -> `scripts/lighthouse.sh`. No horizontal scroll, fonts rendered, no console errors, trackers blocked.
-2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (+ `RM=1` for
-   the fallback frames; `WOW_ACT=<js>` to start an interaction). WOW frames are mid-animation (7 time / 6 scroll
-   positions). 4+ structural tells = fail. Then `python3 scripts/saturation.py <out>/*.png`: mean hot-pixel share
+2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (`MODE=tool` for tool UIs), then the
+   fallback frames with a SECOND run `RM=1 WOW=<sel> SHOTS=0 node scripts/chrome-shot.mjs ...` into the SAME out dir (adds `*-rm-tN.png`;
+   with RM=1 the report goes to `report-rm.json`, so the gate-2 `report.json` and its eval are never overwritten and no EVAL is needed).
+   `WOW_ACT=<js>` starts an interaction. WOW frames are mid-animation (7 time / 6 scroll positions) clocked from the scroll to the
+   wow; for a wow that reveals on scroll add `WOW_DELAY=900` so frame t1 is after the reveal (.6s + stagger) completes. 4+ structural tells = fail. Then `python3 scripts/saturation.py <out>/*.png`: mean hot-pixel share
    > 0.12 = toy palette = fail (approved pages 0.00-0.01, rejected ember v3 0.19).
 3. **Premium at section level**: `python3 scripts/critic.py --calibrate` once, then
-   `python3 scripts/critic.py <out>/sections --wow wow --wow-test "<acceptance test>"` (`--wow` is required; `tells.js` `craft_fail` also fails the page). Fresh critic per section with gallery anchors; scores,
+   `python3 scripts/critic.py <out>/sections --wow wow --wow-test "<acceptance test>"` (canonical form everywhere; `--wow` is required, `--mode tool` for tool UIs; `tells.js` `craft_fail` also fails the page). Fresh critic per section with gallery anchors; scores,
    ban hits, wow and the distinctiveness test; exit 0 only when everything passes. Iterate: fix, re-shoot, re-run,
    log each round in NOTES.md. Three failed rounds on one section = replace that section's visual idea.
    Scale: the critic scores 1-5 and 4 = 7/10; a brief's "7/10 and above" is applied as the pass rule: explanatory_visual >= 4, nothing below 3, at most two 3s, no ban hits (critic.py `verdict`, rubric.md).
@@ -219,7 +234,7 @@ PASS = gate; WEAK = needs a human ear; FAIL = fix the sound. Use clips >= 10 s (
 | scripts/gen-image.sh, optimize-images.sh, get-font.sh | image generation and AVIF/WebP; self-hosted fonts |
 | mcp/imagegen/ | the premium-web-imagegen MCP server (server.py, core.py, api_call.py, test_core.py); providers incl. local fallback |
 | ~/dev/freemium-demo-kit, ~/dev/audio-judge, ~/dev/local-imagegen | external tools for steps 10, 11 and the local image fallback (referenced, not copied) |
-| assets/skeleton/ | generic starting site; assets/recipes/ scroll-scene.js, particles.js |
+| assets/skeleton/ | generic starting site (tokens.css dark default; tokens-tool.css light-default tool tokens); assets/recipes/ scroll-scene.js, particles.js |
 | examples/ | not shipped in this plugin (README.md "Acceptance test" describes them) |
 
 Register the image MCP (Angel runs it; never edit his config):

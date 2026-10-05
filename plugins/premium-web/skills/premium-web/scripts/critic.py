@@ -15,8 +15,12 @@ NOT RUN != PASS: a missing/unrunnable gate prints `UNVERIFIED: <reason>` and exi
 or not scanned at >= 1000px, mode mismatch); it never exits 0. If something else already failed for real, exit is 1.
 env: CRITIC=claude|codex (default claude: `claude -p --allowedTools Read`), CRITIC_MODEL (default sonnet),
      CRITIC_JOBS=4 parallel critics.
+Progress: per-section "[critic +Ns] start/done <label>: PASS|FAIL" lines on STDERR (stdout keeps only the verdict lines).
+Runtime (estimate, not a benchmark): each critic is one model call of ~1-4 min with a 600s cap and one retry. Sections run CRITIC_JOBS at a time,
+then wow, then page: expect ~5-20 min for 3-8 sections, and ~10-15 min for --calibrate. Run it in the background (or with a >= 20 min tool
+timeout) and tail stderr; silence is not a hang. Budget this inside the time box (SKILL.md "Time box").
 """
-import json, os, re, subprocess, sys
+import json, os, re, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -287,6 +291,17 @@ def calibrate():
     return 1 if bad else 0
 
 
+_T0 = time.time()
+
+
+def timed(label, fn, *args):
+    """Progress to stderr (stdout stays the verdict lines): one fresh critic is a 1-4 min model call, so a silent run looks hung."""
+    print(f"[critic +{time.time() - _T0:.0f}s] start {label}", file=sys.stderr, flush=True)
+    j = fn(*args)
+    print(f"[critic +{time.time() - _T0:.0f}s] done  {label}: " + ("ERROR (critic unavailable)" if "error" in j else "PASS" if j.get("pass") else "FAIL"), file=sys.stderr, flush=True)
+    return j
+
+
 def main(a):
     global MODE
     if "--mode" in a:
@@ -312,8 +327,10 @@ def main(a):
         print(f"no frames for --wow {wow}"); return 2
     unverified = []
     with ThreadPoolExecutor(int(os.environ.get("CRITIC_JOBS", 4))) as ex:
-        res = dict(zip([k for k in secs if k != "wow"], ex.map(lambda k: judge_section(k, secs[k]), [k for k in secs if k != "wow"])))
-        w = ex.submit(judge_wow, secs[wow]).result() if wow else None
+        names = [k for k in secs if k != "wow"]
+        print(f"[critic] {len(names)} sections ({os.environ.get('CRITIC_JOBS', 4)} parallel) -> wow -> page; typically 5-20 min, see Usage", file=sys.stderr, flush=True)
+        res = dict(zip(names, ex.map(lambda k: timed("section " + k, judge_section, k, secs[k]), names)))
+        w = timed("wow " + wow, judge_wow, secs[wow]) if wow else None
         rep = root.parent / "report.json"
         evals = [v["eval"] for v in json.loads(rep.read_text()).values() if isinstance(v.get("eval"), dict) and "tells" in v["eval"]] if rep.exists() else []
         tells = next((e for e in evals if e.get("desktop_gates")), None)  # a 390 scan has the desktop craft gates switched off
@@ -327,6 +344,7 @@ def main(a):
         # one shot from EVERY section first, then fill to 10: the first 10 in order saw only the top half of sealref
         wide = [v[0] for v in w14.values() if v] + [p for v in w14.values() for p in v[1:]]
         wide = wide[:10]
+        print(f"[critic +{time.time() - _T0:.0f}s] start page", file=sys.stderr, flush=True)
         page = judge_page(wide, json.dumps({"hits": tells["hits"], "templaty": tells["templaty"]}) if tells else "(not run: add EVAL=scripts/tells.js)")
         if tells and tells.get("craft_fail"):
             page["pass"] = False
