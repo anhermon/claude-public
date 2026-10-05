@@ -88,7 +88,7 @@ record, the primary number inside the context that explains it.
 - No uppercase micro-label overload: sentence-case column headers and field labels; caps only for a handful of true
   abbreviations (`caps_micro_labels` gate stays hard).
 - Palette restraint and saturation as in `styles.md`/`saturation.py` (unchanged): neutral surfaces, hairline borders,
-  **0-3 chromatic hues, spent on state and selection**, no gradient fills, no pastel pills, no card shadows. Dark and light.
+  **1-3 chromatic hues, spent on state and selection** (a fully grayscale app with no media fails `palette`), no gradient fills, no pastel pills, no card shadows. Dark and light.
 - Material: real content, real ids and timestamps (`"2min ago"`, `#339365`, pod names), never lorem or round numbers.
 
 ## 5. Gates (all three, in order)
@@ -97,7 +97,7 @@ record, the primary number inside the context that explains it.
    performs the walk-through and **records the step count and time-to-first-result**; the counts must match NOTES.md.
    Screenshot at both widths; open them and look (an app that renders but whose filter does nothing is a fail).
 2. **Not templaty**: `tells.js` app profile (`MODE=app`, `EVAL=scripts/tells.js`). Hard fails kept: `equal_card_grids`,
-   `caps_micro_labels`, `palette`, `material`. Added hard fails: `density`, `interactive_affordance`, `state_coverage`,
+   `caps_micro_labels`, `palette`. `material` is reported as a tell, not a hard fail, in app mode (table-only screens have no drawn media). Added hard fails: `density`, `interactive_affordance`, `state_coverage`,
    `page_shaped_mismatch`. Dropped as hard (measured, not gating): `type_scale`, `wow_visible`, `scale_change`, `panel_run`.
    `scripts/saturation.py` unchanged.
 3. **Critic**: `critic.py --mode app` against `rubric-app.md` (task clarity, hierarchy, density, states, interaction,
