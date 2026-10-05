@@ -46,7 +46,10 @@ density. What changes:
 - The skeleton (`assets/skeleton/`) is a marketing page: for tool mode take only tokens.css, reveal.js and the font;
   build the app shell yourself. Sections become views or regions; each still needs an explanatory visual, and the
   gates still run on the real screens (shoot each main view; `SECTIONS=1` where regions are `<section>`).
-- Anchors: `references/gallery/` and wow.md "Measured exemplars" list what is measured for tools; the older anchors
+- Commands: tells.js `MODE=tool EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440`; critic.py
+  `MODE=tool python3 scripts/critic.py ...` or `python3 scripts/critic.py <dir> --mode tool --wow wow --wow-test "..."`.
+  Read wow.md "Tool mode" for the numbers and `references/tool-ui-exemplars.md` for the measured exemplars.
+- Anchors: `references/gallery/README.md` (tool-UI anchors) and wow.md "Measured exemplars" list what is measured for tools; the older anchors
   are marketing pages, so state in NOTES.md when no anchor fits your screen. If a gate fails because of the tool's
   structure, stop and ask; do not drop it.
 
@@ -87,8 +90,8 @@ competitor's page, it is not the idea yet.
 ### 5. Signature moment (wow.md v2), MANDATORY, before building sections
 Write the product's verb, **>= 5 candidates** across families, scored on distinctiveness / truth / scale (feasibility last),
 reject any panel/chart/table/card row (that is the "nice" 3), pick one, and write its **acceptance test** ("a stranger
-screenshotting this would say ___" + numeric checks). It must be the product itself at >= 50% viewport width above the
-fold or the page's centrepiece. Poster/reduced-motion frame first. Recipes: `assets/skeleton/hero-strands.js` (WebGL),
+screenshotting this would say ___" + numeric checks). It must be the product itself above the fold or the page's centrepiece; the enforced size
+(marketing 25% x 30%, tool mode 50% x 40%) and the 50% guidance are in wow.md "Placement" and "Tool mode". Poster/reduced-motion frame first. Recipes: `assets/skeleton/hero-strands.js` (WebGL),
 `assets/recipes/scroll-scene.js`, `assets/recipes/particles.js`. Section-craft numbers (<= 3 consecutive panels, >= 2 scale
 changes, type contrast, one real data visual, meaningful motion) are in genre-escape.md and gated by tells.js. Do a
 reference-gap check against 3-5 live best-in-class sites (genre-escape.md section 3). Wow < 4/5 fails the page whatever else scores.
@@ -120,7 +123,7 @@ cards, decorative 01/02/03, or empty space passed off as minimalism. Minimal sty
 ### 8. Build
 Start from `assets/skeleton/` (tokens.css dark default + light, site.css, reveal.js, form.css/js, index.html with
 OG/JSON-LD, poster + canvas hero) and restyle it to the direction; do not ship its look unchanged.
-The skeleton's h1 tops out at 72px (5vw at 1440), below genre-escape.md's >= 7vw rule, and its hero is a poster, not
+The skeleton's h1 tops out at 72px (5vw at 1440), below genre-escape.md's 7vw guidance, and its hero is a poster, not
 your wow: adding the display-type moment and the signature object is your job, not the skeleton's.
 - Motion (motion.md): UI .15-.2s, reveals .6s cubic-bezier(.2,0,0,1) via IntersectionObserver; WebGL/scenes with
   poster fallbacks for reduced motion, Save-Data, no WebGL, context lost, slow-frame watchdog; 60fps.
@@ -144,7 +147,7 @@ An unrunnable gate is `UNVERIFIED` (Hard rules), not a pass.
    `python3 scripts/critic.py <out>/sections --wow wow --wow-test "<acceptance test>"` (`--wow` is required; `tells.js` `craft_fail` also fails the page). Fresh critic per section with gallery anchors; scores,
    ban hits, wow and the distinctiveness test; exit 0 only when everything passes. Iterate: fix, re-shoot, re-run,
    log each round in NOTES.md. Three failed rounds on one section = replace that section's visual idea.
-   Scale: the critic scores 1-5 and 4 = 7/10; a brief's "7/10 and above" means every relevant score >= 4.
+   Scale: the critic scores 1-5 and 4 = 7/10; a brief's "7/10 and above" is applied as the pass rule: explanatory_visual >= 4, nothing below 3, at most two 3s, no ban hits (critic.py `verdict`, rubric.md).
 
 Then Read every screenshot yourself. A passing transcript is not a passing render.
 
@@ -201,7 +204,9 @@ PASS = gate; WEAK = needs a human ear; FAIL = fix the sound. Use clips >= 10 s (
 | path | what |
 |---|---|
 | references/rubric.md | the standard: section bar, ban list, templaty tells, distinctiveness test, scores, wow, anhermon per-section table, approved/rejected gallery |
-| references/gallery/ | 17 anchor screenshots (approved / shipped / rejected / nice-not-wow) the critic compares against |
+| references/gallery/ | 23 anchor screenshots (approved / shipped / rejected / nice-not-wow, incl. tool-UI anchors) the critic compares against; README.md indexes them |
+| references/gallery/README.md | gallery index: verdict and source of every anchor, incl. the tool-UI set |
+| references/tool-ui-exemplars.md | measured tool-UI exemplars (Linear, Vercel status, OpenAI status, Axiom) and the generic-dashboard rejects, for tool mode |
 | references/genre-escape.md | genre-template escape, section-craft numbers (panel runs, scale changes, type scale), reference-gap check |
 | references/wow.md | signature-moment procedure, starter candidates per style, recipes, performance and fallback rules |
 | references/styles.md | style recipes incl. terminal-native without the cliche; material-by-style table |
@@ -209,7 +214,8 @@ PASS = gate; WEAK = needs a human ear; FAIL = fix the sound. Use clips >= 10 s (
 | references/type-systems.md, motion.md, forms.md, trust.md, verification.md | rules and the measured reference table |
 | scripts/serve.mjs, chrome-shot.mjs, shoot.sh, lighthouse.sh | serve, screenshot (viewport steps, SECTIONS, WOW), Simulator, Lighthouse |
 | scripts/measure-site.js, tells.js, saturation.py | computed-style measurement (SUMMARY=1 for the short form); templaty-tells DOM scan (`data-tell-ok` marks deliberate repeats); hot-pixel saturation meter |
-| scripts/critic.py | calibrated section/wow/page critic, pass/fail JSON |
+| scripts/critic.py | calibrated section/wow/page critic, pass/fail JSON (`--mode tool` or `MODE=tool` for tool UIs) |
+| scripts/test_critic_parse.py, scripts/test_tells.js | offline self-checks: critic verdict/parse, tells.js tool-mode gate maths and wow.md numbers |
 | scripts/gen-image.sh, optimize-images.sh, get-font.sh | image generation and AVIF/WebP; self-hosted fonts |
 | mcp/imagegen/ | the premium-web-imagegen MCP server (server.py, core.py, api_call.py, test_core.py); providers incl. local fallback |
 | ~/dev/freemium-demo-kit, ~/dev/audio-judge, ~/dev/local-imagegen | external tools for steps 10, 11 and the local image fallback (referenced, not copied) |

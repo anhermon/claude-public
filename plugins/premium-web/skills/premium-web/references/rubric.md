@@ -1,6 +1,6 @@
 # Premium vs placeholder: the section rubric
 
-This file is the standard. `scripts/critic.sh` pastes it into the critic's prompt verbatim, so every rule here
+This file is the standard. `scripts/critic.py` pastes it into the critic's prompt verbatim, so every rule here
 must be checkable from screenshots. Anchors live in `gallery/` (960px webp, real screenshots from our own work).
 
 ## The bar
@@ -164,8 +164,8 @@ the author's own site; if one could be mistaken for the other, it fails.
 Scale mapping: 1-5 here, and 4 = 7/10 (the "7/10 and above" bar in briefs). The critic's rule is below; the old
 "all five >= 4" was unreachable for approved pages (see critic.py `verdict`).
 
-A section **passes** when every score is >= 4, explanatory_visual is present, and ban_hits is empty.
-`critic.sh` computes pass/fail itself from the scores; it does not trust a model's verdict.
+A section **passes** when explanatory_visual >= 4, no score is below 3, at most two scores are 3, explanatory_visual is present, and ban_hits is empty (plus the section saturation limit).
+`critic.py` computes pass/fail itself from the scores; it does not trust a model's verdict.
 
 ## Wow (page level, scored once, on the signature section)
 

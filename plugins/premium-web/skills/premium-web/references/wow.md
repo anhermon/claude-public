@@ -39,7 +39,7 @@ product itself or one rendered thing) in the first viewport, display type 4.5-5.
 ## Tool mode
 
 Use when the deliverable is a **tool UI** (an ops console, release board, trace viewer, dashboard-as-product), not a page that sells
-one. Why a separate mode: a dense tool has no marketing hero, so "h1 >= 7vw" and "two scale-change sections below the hero" cannot be
+one. Why a separate mode: a dense tool has no marketing hero, so the marketing h1 guidance (about 7vw, not enforced) and "two scale-change sections below the hero" cannot be
 met by honest work, and agents answered by skipping the skill ("poor fit") and shipping the generic mockup (hero card + KPI strip +
 side panel + table), which Angel rejected as "nothing premium, out-of-the-box AI generated". Tool mode keeps the bar and moves it to
 what a tool can truthfully have. **Marketing mode and its thresholds are unchanged**; do not use tool mode for a landing page.
@@ -51,7 +51,7 @@ what a tool can truthfully have. **Marketing mode and its thresholds are unchang
    >= 12 records/marks. (Marketing: 25% x 30% as the hard gate, 50% as the guidance for tool-product heroes; tool mode makes 50% the
    gate because there is no headline competing for the first screen, so the data object must be the first screen.)
 3. **One display-scale numeral or label** (not an h1): the largest text is >= 4x the median text AND >= 4vw (58px at 1440): the one
-   number the tool exists to answer ("30 in flight", "4 blocked", "p95 412ms"). Marketing wants h1 or numeral >= 7vw because the h1 is
+   number the tool exists to answer ("30 in flight", "4 blocked", "p95 412ms"). Marketing guidance (not enforced; only the 4x ratio is) is an h1 or numeral near 7vw because the h1 is
    the hero; tool mode lowers the floor to 4vw because the numeral lives inside a dense layout, but keeps the 4x ratio.
 4. **One full-bleed scale change**: one element spanning the viewport edge to edge (drawn figure, contrasting band) >= 160px tall, or
    type >= 12vw. Marketing needs 2 below the hero; a dense single-screen tool earns 1, but edge to edge, not a card in the gutters.

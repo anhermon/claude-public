@@ -10,7 +10,7 @@ wow_visible = `craft_fail`, which fails the page) and the critic.
 Write: "Left alone this page becomes ___" and list 4 things you will change. Known genre attractors:
 - **dev-tool dark**: graphite ground, hairline-bordered mono panels, one orange/green accent, 01/02/03 steps, file-tree box.
   Escape: change the ground (a light/paper or saturated-muted hero field), put the product at 50%+ width not in a card,
-  use display type >= 8vw somewhere, replace panels by drawn figures that bleed to the viewport edge.
+  use display type at 7vw or more somewhere (guidance, see section 2), replace panels by drawn figures that bleed to the viewport edge.
 - **data-docs**: tables + bar lists + chips. Escape: one navigable visual field (all N items as one map/grid), tables only for evidence.
 - **SaaS-centred**: centred H1, two buttons, logo row, three cards. Escape: asymmetric hero, product as hero.
 - **dashboard / run-view** (tool mode): hero card + stat bar + side panel + table; KPI-tile rows (big number, delta
@@ -33,7 +33,7 @@ by the structure of the tool, stop and ask.)
 - No more than **3 consecutive** sections whose main content is a bordered/filled box (`panel_run`). Mono panels: max 1 per page.
 - At least **2 scale-change sections** below the hero (`scale_change`): edge-to-edge drawn figure, a contrasting full-width
   ground, or display type >= 12vw. Not "the same column with a bigger heading".
-- **Type scale**: largest text >= 4x median text (`type_scale`); the h1 or one numeral >= 7vw at 1440.
+- **Type scale**: largest text >= 4x median text (`type_scale`); this ratio is what tells.js enforces (tool mode adds >= 4vw, wow.md "Tool mode"). Guidance, not measured: the marketing h1 or one numeral at about 7vw (100px) or more at 1440.
 - **One real data-driven visual** per page that is not decoration: built from the product's measured data (all 80 items
   placed, each drawn from its record), with a legend and an honest count. Decorative gradients do not count.
 - **Real motion tied to meaning**: motion shows a state change of the data (offset closing, a count running, a segment

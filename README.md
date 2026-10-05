@@ -51,7 +51,7 @@ claude install anhermon/claude-public/commit.plugin
 **v0.2.0** — AI image generation with expert prompt engineering.
 
 ### premium-web
-**v1.0.0** — Build premium, studio-quality web pages: section-level rubric, mandatory signature "wow" moment, calibrated critic loop and optional image generation.
+**v1.1.0** — Build premium, studio-quality web pages and tool UIs (tool mode): section-level rubric, mandatory signature "wow" moment, calibrated critic loop and optional image generation.
 
 ### search
 **v1.0.0** — Precise codebase exploration using ripgrep and tree-sitter.
