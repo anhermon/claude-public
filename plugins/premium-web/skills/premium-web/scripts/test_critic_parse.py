@@ -57,7 +57,7 @@ print("unverified/mode ok")
 # --- step 0 gate: nothing is judged without a classification of the same mode ---
 rc, out = run(ok_t, "marketing", notes="");             assert rc == 4 and "CLASSIFICATION REQUIRED (exit 4)" in out, out
 rc, out = run(ok_t, "marketing", notes=NOTES["app"]);   assert rc == 4 and "mode: app but this run is marketing" in out, out
-rc, out = run(ok_t, "marketing", notes=NOTES["marketing"].replace("prospects from search", "on-call SREs")); assert rc == 4 and "operators" in out, out
+rc, out = run(ok_t, "marketing", notes=NOTES["marketing"].replace("first visit", "daily")); assert rc == 4 and "return and operate" in out, out
 print("classification gate ok")
 # --- app mode: screens + flows + signature clarity (judges stubbed) ---
 A = ["task_clarity", "information_hierarchy", "density", "state_coverage", "interaction_quality", "distinctiveness"]

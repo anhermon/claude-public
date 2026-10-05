@@ -55,9 +55,11 @@
       <tr data-row tabindex="0"><td class="id">d-4116</td><td>search</td><td class="ok">ok</td><td class="num">199 s</td><td class="num">3 h ago</td></tr>
     </tbody></table>
     <p data-state="empty" hidden>No deploys match this filter. Clear the filter to see all 412 deploys.</p>
-    <div data-state="loading" aria-busy="true" hidden></div>
+    <div data-state="loading" aria-busy="true" hidden>Loading deploys...</div>
     <p data-state="error" hidden>Could not load deploys: the history service timed out. Retry; the rows above are still current as of 2 min ago.</p>
     <p data-state="partial" hidden>Showing 24 of 412 deploys; 3 services did not answer and are missing.</p>
   </div>
 </main>
-</html>
+</html><script>/* ?state=empty|loading|error|partial reveals that state hook so each one can be shot and reviewed */
+var st=new URLSearchParams(location.search).get("state"),el=st&&document.querySelector("[data-state="+st+"]");if(el)el.hidden=false;</script>
+

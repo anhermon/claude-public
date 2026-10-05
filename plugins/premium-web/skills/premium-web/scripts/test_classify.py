@@ -13,7 +13,9 @@ assert bad(READ, "app", "NOTES.md says mode: marketing")                        
 assert bad(APP, "marketing", "NOTES.md says mode: app")
 assert bad(READ.replace("READ", "WORK"), "marketing", "cannot have mode")                    # WORK with marketing
 assert bad(READ.replace("classification: READ", "classification: maybe"), "marketing", "READ, WORK or MIXED")
-assert bad(READ.replace("users: prospects arriving from search", "users: on-call SREs and admins"), "marketing", "operators")  # never default to marketing when users operate it
+assert bad(READ.replace("frequency: first visit", "frequency: daily"), "marketing", "return and operate")  # never default to marketing when people return and operate it
+assert bad(READ.replace("users: prospects arriving from search", "users: engineers who operate the console"), "marketing", "return and operate")
+assert ok(READ.replace("users: prospects arriving from search", "users: SREs and admins evaluating log search"), "marketing")  # a job title alone is fine
 assert bad(READ.replace("evidence: the page sells the product; nobody operates it", "evidence: short"), "marketing", "evidence")
 assert bad(READ.replace("frequency: first visit", "frequency:"), "marketing", "frequency")
 mixed = READ.replace("READ", "MIXED")
@@ -48,3 +50,9 @@ if shutil.which("node"):
     r = subprocess.run(["node", str(here / "chrome-shot.mjs"), "http://127.0.0.1:9/", str(empty / "out")], capture_output=True, text=True, env={**env, "MODE": "tool"}, cwd=empty)
     assert r.returncode == 4 and "mode: marketing but this run is app" in r.stderr, (r.returncode, r.stderr)
 print("scripts refuse without classification (exit 4) ok")
+# the template documented in SKILL.md must parse as written (doc and parser stay in sync)
+import re
+blk = re.search(r"```\n(## Step 0 classification\n.*?)```", (here.parent / "SKILL.md").read_text(), re.S).group(1)
+assert c.check(blk, "app") == (c.check(blk, "app")[0], []) and c.parse(blk)["mode"] == "app", c.check(blk, "app")[1]
+assert c.parse("## Step 0 classification\nusers: ticket #4123 triage\n")["users"] == "ticket #4123 triage"
+print("skill template ok")

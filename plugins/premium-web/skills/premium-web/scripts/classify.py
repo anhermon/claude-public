@@ -23,7 +23,9 @@ Exit codes (shared by chrome-shot.mjs and critic.py): 0 ok, 4 classification mis
 import json, os, re, sys
 from pathlib import Path
 
-OPERATE = re.compile(r"\b(operators?|operations|ops|on-?call|sres?|admins?|administrators?|internal|support agents?)\b", re.I)
+# READ means arrive-read-leave: refused when the stated frequency is a recurring-use rhythm, or users say they operate it (a job title alone, e.g. "SREs evaluating log search", is fine)
+RECURRING = re.compile(r"\b(daily|every ?day|each day|per day|a day|hourly|per hour|every shift|each shift|several times|weekly|per week|a week|every week|multiple times)\b", re.I)
+OPERATING = re.compile(r"\b(operat(?:e|es|ing) (?:it|the|this|their|our)\b|use[sd]? it (?:daily|every|all day)|work(?:s|ing)? in it)", re.I)
 HEADER = re.compile(r"^#{1,4}\s*step\s*0\b.*$", re.I | re.M)
 
 
@@ -41,7 +43,7 @@ def parse(text):
     for ln in body.splitlines():
         if in_tasks and re.match(r"^\s*[-*]\s+\S", ln):
             tasks.append(re.sub(r"^\s*[-*]\s+", "", ln).strip()); continue
-        k = re.match(r"^\s*([a-z_]+)\s*:\s*(.*?)\s*$", ln)
+        k = re.match(r"^\s*([a-z_]+)\s*:\s*(.*?)\s*$", re.sub(r"\s+#\s.*$", "", ln))  # inline " # comment" allowed; "ticket #41" kept
         if k:
             in_tasks = k.group(1) == "primary_tasks"
             if not in_tasks:
@@ -75,8 +77,9 @@ def check(text, mode):
             p.append(f"{k}: is empty")
     if len(f.get("evidence", "")) < 20:
         p.append("evidence: needs >= 20 characters (the request's own words, task verbs find/compare/trigger/approve/edit, usage numbers)")
-    if cls == "READ" and OPERATE.search(f.get("users", "")):
-        p.append(f"classification READ but users names operators ({OPERATE.search(f['users']).group(0)!r}): people who operate the thing make it WORK or MIXED")
+    hit = RECURRING.search(f.get("frequency", "")) or OPERATING.search(f.get("users", ""))
+    if cls == "READ" and hit:
+        p.append(f"classification READ but frequency/users say people return and operate it ({hit.group(0)!r}): that makes it WORK or MIXED")
     if fm == "app":
         t = f["primary_tasks"]
         if not 1 <= len(t) <= 8 or any(len(x) < 6 for x in t):

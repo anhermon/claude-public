@@ -128,12 +128,12 @@ all steps, three gates, calibrated critic, candidates), different bar: **task sp
 - **No wow hero. Signature clarity instead** (wow.md "App mode"): one distinctive, truthful way of making the product's own data legible, validated by the walk-through
   (it shortens a task against the table baseline). It is judged by the critic, not sized by a detector.
 - **Walk-throughs are the evidence**: perform each primary task in the real UI (Playwright), record steps, keystrokes and time-to-first-result, and write
-  `walkthrough.json` (`{"tasks":[{"task","steps","result","shot","screens":[...]}]}`, the same fields as candidates.json `tasks[]`). Gate 3 reads it.
+  `walkthrough.json` (`{"tasks":[{"task","steps","result","shot","screens":[...]}]}`, the same fields as candidates.json `tasks[]`). Gate 3 reads it. `<screen-dir>` and `screens[]` are the directory names under `<out>/sections/` (`<nn-id>`, e.g. `00-main`: `<nn>` is the index, the id comes from the screen element's `id`, else its tag).
 - **Starting point**: `assets/skeleton/app-shell.html` + `tokens-app.css` (light, state-only colour, 12-14px data, tabular numerals). The marketing skeleton is not a base for apps.
 - **Styles**: the app recipes in styles.md; **genre**: the dashboard / run-view attractor in genre-escape.md; type rules in styles.md "App type".
 - **Gates** (verification.md; the three gates still run on the real screens, one `data-screen` per view):
   `MODE=app EVAL=scripts/tells.js SECTIONS="[data-screen]" SHOTS=1 node scripts/chrome-shot.mjs <url> <out> 1440,390` then `python3 scripts/saturation.py <out>/*.png`, then
-  `python3 scripts/critic.py <out>/sections --mode app --signature <screen-id> --signature-test "<sentence>" --walkthrough walkthrough.json`.
+  `python3 scripts/critic.py <out>/sections --mode app --signature <screen-dir> --signature-test "<sentence>" --walkthrough walkthrough.json`.
   tells.js app profile hard fails: `density`, `interactive_affordance`, `state_coverage`, `page_shaped_mismatch`, `data_wow_in_app` (any `data-wow`), `equal_card_grids`,
   `caps_micro_labels`, `palette`; `type_scale`, `wow_visible`, `scale_change`, `panel_run` are measured but not gated. Thresholds: wow.md "App mode".
 - **Marketing thresholds are unchanged** and no app rule loosens them. `page_shaped_mismatch` flags WRONG-MODE STRUCTURE: rebuild as shell + work surface, or fix step 0 if nobody operates it.
