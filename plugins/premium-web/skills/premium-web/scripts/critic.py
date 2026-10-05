@@ -9,6 +9,10 @@ Usage:
 Each section is shown to a FRESH critic with one PASS anchor and one FAIL anchor from references/gallery, because
 an uncalibrated critic called the Meridian method section "visually rich" (2026-10-01). Pass/fail is computed here
 from the scores, never taken from the model. Exit code 1 = at least one section fails; 3 = critic unavailable (quota/session limit), verdict unknown.
+Mode: default marketing (unchanged). `--mode tool` or env MODE=tool judges a TOOL UI by references/wow.md "Tool mode" (the data object is
+the wow) and requires the tells.js scan to have been run with the same MODE (a mismatch is UNVERIFIED, never a pass).
+NOT RUN != PASS: a missing/unrunnable gate prints `UNVERIFIED: <reason>` and exits 3 (no claude/codex binary, quota/limit, tells.js not run
+or not scanned at >= 1000px, mode mismatch); it never exits 0. If something else already failed for real, exit is 1.
 env: CRITIC=claude|codex (default claude: `claude -p --allowedTools Read`), CRITIC_MODEL (default sonnet),
      CRITIC_JOBS=4 parallel critics.
 """
@@ -18,7 +22,9 @@ from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import saturation  # noqa: E402  (pixel share of hot colours per screenshot)
+import saturation  # noqa: E402  (pixel share of hot colours per screenshot; owns PAGE_MAX / SECTION_MAX)
+PAGE_MAX, SECTION_MAX = saturation.PAGE_MAX, saturation.SECTION_MAX
+MODE = os.environ.get("MODE", "marketing")
 GALLERY = SKILL / "references" / "gallery"
 RUBRIC = (SKILL / "references" / "rubric.md").read_text()
 CRIT = ["distinctiveness", "explanatory_visual", "density_detail", "hierarchy", "polish"]
@@ -26,6 +32,12 @@ PASS_REFS = ["accept-anhermon-v4-guard-codedrawn.webp", "approved-pebble-jar-mat
 FAIL_REFS = ["reject-meridian-method.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-principles-cards.webp", "reject-thin-line-art.webp"]  # judge_section shows the first two
 APPROVED = ["approved-pebble-hero.webp", "approved-pebble-jar-maths.webp", "approved-halcyon-hero.webp", "approved-halcyon-instrument.webp"]
 REJECTED = ["reject-ember-hero-terminal.webp", "reject-ember-principles-cards.webp", "reject-meridian-method.webp", "nice-not-wow-meridian-logpanel.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp"]
+TOOL_NOTE = """
+TOOL MODE (this is a dense tool UI, not a landing page; references/wow.md "Tool mode"): there is no h1 hero. The WOW and the
+explanatory visual are the product's own data object (a timeline of all items, a trace, a map), drawn from real records, >= 50% of
+the viewport width and the first thing seen. A hero card + KPI stat strip + side panel + table is the generic AI dashboard template:
+score it 1-2 on distinctiveness and 1-3 on wow however clean it is. A small sparkline/gantt inside a card is a 3 at best.
+"""
 IMG = (".png", ".webp", ".jpg", ".jpeg")
 
 SECTION_TASK = """You are a demanding design director reviewing ONE section of a marketing web page against the rubric
@@ -101,10 +113,10 @@ def hot_share(paths):
 def judge_page(shots, tells="(not run)", exclude=()):
     j = ask(PAGE_TASK.format(approved=", ".join(str(GALLERY / a) for a in APPROVED if a not in exclude),
                              rejected=", ".join(str(GALLERY / a) for a in REJECTED if a not in exclude),
-                             shots="\n".join(f"- {s}" for s in shots), tells=tells, sat=f"{hot_share(shots):.2f} (toy above 0.12)") + "\n\nRUBRIC:\n" + RUBRIC, ("could_be_20_others", "closest_to"))
+                             shots="\n".join(f"- {s}" for s in shots), tells=tells, sat=f"{hot_share(shots):.2f} (toy above {PAGE_MAX:.2f})") + (TOOL_NOTE if MODE == "tool" else "") + "\n\nRUBRIC:\n" + RUBRIC, ("could_be_20_others", "closest_to"))
     j["saturation"] = round(hot_share(shots), 3)
-    j["pass"] = page_pass(j) and j["saturation"] <= 0.12  # measured, not model-judged: ember v3 0.19, approved pages 0.00-0.01
-    if j["saturation"] > 0.12:
+    j["pass"] = page_pass(j) and j["saturation"] <= PAGE_MAX  # measured, not model-judged: ember v3 0.19, approved pages 0.00-0.01
+    if j["saturation"] > PAGE_MAX:
         j.setdefault("fixes", []).append(f"saturation: {j['saturation']} of pixels at hot colour; neutral large fields, one small spot colour")
     return j
 
@@ -165,7 +177,10 @@ def ask(prompt, need=()):
         cmd = ["claude", "-p", "--allowedTools", "Read", "--model", os.environ.get("CRITIC_MODEL", "sonnet"),
                "--output-format", "json", "--json-schema", json.dumps(schema)]
     for _ in range(2):
-        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
+        try:
+            r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
+        except (FileNotFoundError, subprocess.TimeoutExpired) as e:  # no binary / hung critic: unknown, not a design verdict
+            return {"error": f"UNVERIFIED: critic could not run ({cmd[0]}: {type(e).__name__} {e})", "raw": ""}
         out = r.stdout
         if not codex:
             try:
@@ -205,12 +220,12 @@ def judge_section(name, shots, exclude=""):
     fail_ref = ", ".join(str(GALLERY / p) for p in [p for p in FAIL_REFS if p != exclude][:2])
     wide = [p for p in shots if Path(p).name.startswith("1440")] or shots
     sat = hot_share(wide)
-    j = ask(SECTION_TASK.format(pass_ref=pass_ref, fail_ref=fail_ref, name=name, sat=f"{sat:.2f} (toy above 0.20)",
-                                shots="\n".join(f"- {s}" for s in shots)) + "\n\nRUBRIC:\n" + RUBRIC, ("scores", "ban_hits", "explanatory_visual_present"))
+    j = ask(SECTION_TASK.format(pass_ref=pass_ref, fail_ref=fail_ref, name=name, sat=f"{sat:.2f} (toy above {SECTION_MAX:.2f})",
+                                shots="\n".join(f"- {s}" for s in shots)) + (TOOL_NOTE if MODE == "tool" else "") + "\n\nRUBRIC:\n" + RUBRIC, ("scores", "ban_hits", "explanatory_visual_present"))
     ok, why = verdict(j)
     j["saturation"] = round(sat, 3)
-    if sat > 0.20:  # measured: ember v3 drift/access/revisions 0.35-0.64; approved pages 0.00-0.01
-        ok, why = False, why + [f"saturation: {sat:.2f} of the section's pixels are full-strength colour (toy palette; limit 0.20)"]
+    if sat > SECTION_MAX:  # measured: ember v3 drift/access/revisions 0.35-0.64; approved pages 0.00-0.01
+        ok, why = False, why + [f"saturation: {sat:.2f} of the section's pixels are full-strength colour (toy palette; limit {SECTION_MAX:.2f})"]
     j["pass"], j["fail_reasons"] = ok, why
     return j
 
@@ -218,7 +233,7 @@ def judge_section(name, shots, exclude=""):
 def judge_wow(shots, test=None):
     j = ask(WOW_TASK.format(wow_pass=GALLERY / "accept-anhermon-v4-hero.webp",
                             wow_nice=GALLERY / "nice-not-wow-meridian-logpanel.webp", wow_test=(test if test is not None else WOW_TEST) or "(none declared)",
-                            shots="\n".join(f"- {s}" for s in shots)) + "\n\nRUBRIC:\n" + RUBRIC, ("wow", "fallback", "motion_polish"))
+                            shots="\n".join(f"- {s}" for s in shots)) + (TOOL_NOTE if MODE == "tool" else "") + "\n\nRUBRIC:\n" + RUBRIC, ("wow", "fallback", "motion_polish"))
     if "error" not in j:
         mid = [x for x in shots if "-t" in Path(x).name and "-rm-" not in Path(x).name]  # motion polish counts only with a real frame sequence
         j["pass"] = (int(j["wow"]["score"]) >= 4 and int(j.get("fallback", {}).get("score", 0)) >= 3  # missing = not judged, never a pass
@@ -253,6 +268,9 @@ def calibrate():
                  "meridian": ["nice-not-wow-meridian-logpanel.webp", "reject-meridian-method.webp"],
                  "ember-v3": ["reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp"]}
         pres = dict(zip(pages, ex.map(lambda k: judge_page([str(GALLERY / f) for f in pages[k]], exclude=pages[k]), pages)))
+    errs = [n for n, j in [*res.items(), *wows.items(), *pres.items()] if "error" in j]
+    if errs:
+        print(f"UNVERIFIED: critic could not judge {', '.join(errs)}: {next(j['error'] for j in [*res.values(), *wows.values(), *pres.values()] if 'error' in j).strip()[-160:]}"); return 3
     bad = 0
     for k, want in {"ember": False, "pebble": True, "halcyon": True, "meridian": False, "ember-v3": False}.items():
         ok = pres[k]["pass"] == want; bad += not ok
@@ -270,6 +288,11 @@ def calibrate():
 
 
 def main(a):
+    global MODE
+    if "--mode" in a:
+        MODE = a[a.index("--mode") + 1]
+    if MODE not in ("marketing", "tool"):
+        print(f"UNVERIFIED: unknown mode {MODE!r} (use marketing or tool)"); return 3
     if a and a[0] == "--calibrate":
         return calibrate()
     if not a:
@@ -287,11 +310,19 @@ def main(a):
     if not wow: wow = None
     if wow and wow not in secs:
         print(f"no frames for --wow {wow}"); return 2
+    unverified = []
     with ThreadPoolExecutor(int(os.environ.get("CRITIC_JOBS", 4))) as ex:
         res = dict(zip([k for k in secs if k != "wow"], ex.map(lambda k: judge_section(k, secs[k]), [k for k in secs if k != "wow"])))
         w = ex.submit(judge_wow, secs[wow]).result() if wow else None
         rep = root.parent / "report.json"
-        tells = next((v["eval"] for v in json.loads(rep.read_text()).values() if isinstance(v.get("eval"), dict) and "tells" in v["eval"]), None) if rep.exists() else None
+        evals = [v["eval"] for v in json.loads(rep.read_text()).values() if isinstance(v.get("eval"), dict) and "tells" in v["eval"]] if rep.exists() else []
+        tells = next((e for e in evals if e.get("desktop_gates")), None)  # a 390 scan has the desktop craft gates switched off
+        if not evals:
+            unverified.append("tells.js was not run (no eval in report.json): add EVAL=scripts/tells.js to chrome-shot, scan at 1440")
+        elif not tells:
+            unverified.append("tells.js only scanned at < 1000px: type_scale, wow_visible, scale_change did not run; scan at 1440")
+        elif tells.get("mode", "marketing") != MODE:
+            unverified.append(f"tells.js ran in {tells.get('mode', 'marketing')} mode but critic is in {MODE} mode (set MODE={MODE} for both)"); tells = None
         w14 = {k: [p for p in v if Path(p).name.startswith("1440")] for k, v in secs.items() if k != "wow"}
         # one shot from EVERY section first, then fill to 10: the first 10 in order saw only the top half of sealref
         wide = [v[0] for v in w14.values() if v] + [p for v in w14.values() for p in v[1:]]
@@ -300,7 +331,7 @@ def main(a):
         if tells and tells.get("craft_fail"):
             page["pass"] = False
             page["craft_fail"] = tells["craft_fail"]
-            print("CRAFT GATE FAIL (tells.js): " + ", ".join(tells["craft_fail"]) + "  [panel_run>3 consecutive boxed sections | scale_change<2 | type_scale<4x | wow not above the fold]")
+            print("CRAFT GATE FAIL (tells.js): " + ", ".join(tells["craft_fail"]) + "  [" + ("panel_run>3 consecutive boxed sections | scale_change<2 | type_scale<4x | wow not above the fold" if MODE != "tool" else "tool mode: data-wow object >= 50% x 40% from >= 12 records | display numeral >= 4x median and >= 4vw | >= 1 edge-to-edge break | panel_run>3") + "]")
         if tells and tells["templaty"]:
             page["pass"] = False
             page["dom_templaty"] = tells["hits"]
@@ -315,9 +346,14 @@ def main(a):
     (root / "critic.json").write_text(json.dumps({"sections": res, "wow": w, "page": page}, indent=1))
     ok = all(j["pass"] for j in res.values()) and (w is None and bool(exempt) or (w is not None and w["pass"])) and page["pass"]
     errs = {k: v["error"] for k, v in list(res.items()) + [("wow", w or {}), ("page", page)] if "error" in v}
+    for u in unverified:
+        print("UNVERIFIED: " + u)
     if errs:  # a quota/session limit is not a verdict: those parts are unknown, never reported as failed designs
         print(f"CRITIC UNAVAILABLE for {', '.join(errs)}: {next(iter(errs.values())).strip()[-160:]}")
-        print("Re-run when the limit resets (or CRITIC=codex); exit 3 = unknown, not failed.")
+        print("UNVERIFIED: critic unavailable; re-run when the limit resets (or CRITIC=codex); exit 3 = unknown, not failed.")
+        return 3
+    if unverified and ok:  # nothing failed, but a gate did not run: unknown, never a pass
+        print(f"NOT VERIFIED: sections pass, {len(unverified)} gate(s) did not run; {root / 'critic.json'}")
         return 3
     print(f"{'ALL SECTIONS PASS' if ok else 'NOT DONE: fix the failing sections and re-shoot'}; {root / 'critic.json'}")
     return 0 if ok else 1

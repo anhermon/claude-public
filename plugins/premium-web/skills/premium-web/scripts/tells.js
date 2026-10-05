@@ -1,9 +1,38 @@
 // Templaty-tells scanner. Paste into a devtools / claude-in-chrome javascript_tool, or run headless:
 //   EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440   (result in report.json -> eval)
+//   Tool UIs (dense ops/dashboard products, no marketing hero): add MODE=tool  (chrome-shot sets window.__TELLS_MODE; in devtools set
+//   window.__TELLS_MODE = "tool" before pasting). Default is "marketing" and its behaviour is unchanged. Tool-mode numbers and the
+//   reason for each are in references/wow.md "Tool mode"; this file's TH below is the machine copy (test_tells.js asserts they agree).
 // Returns JSON: each tell with a count, examples, and hit=true when over its threshold. Thresholds were set on
 // 2026-10-01 against Angel's verdicts: ember + meridian REJECTED, pebble + halcyon APPROVED (see rubric.md).
 // Heuristics, not proof: a hit means "the critic must look at this", a clean scan does not mean premium.
+// NOT RUN != PASS. Result carries mode and desktop_gates (false when the viewport is < 1000px wide: type_scale, wow_visible and
+// scale_change are then NOT evaluated; scan at 1440). Callers must treat a missing result, an exception, a missing desktop_gates
+// or {error:"UNVERIFIED: ..."} as UNVERIFIED (critic.py exits 3; chrome-shot.mjs exits 1 on craft_fail). Under node
+// (`node -e "require('./scripts/tells.js')"`) it only exports { TH, toolGates } for scripts/test_tells.js.
 (() => {
+  // Gate numbers. marketing: documented here only for reference, the inline gates below are unchanged (wow_visible 25% x 30%,
+  // type_scale 4x, scale_change >= 2 below the hero). tool: references/wow.md "Tool mode" (a test keeps the two in step).
+  const TH = { marketing: { wow_w: 0.25, wow_h: 0.3, ratio: 4, breaks: 2 },
+               tool: { wow_w: 0.5, wow_h: 0.4, marks: 12, display_vw: 0.04, ratio: 4, breaks: 1 } };
+  // Pure tool-mode scoring from measurements m = { vw, hero: {w, h, top, marks} | null, big, median, breaks } (w, h as share of viewport).
+  const toolGates = (m, T = TH.tool) => {
+    const h = m.hero, desk = m.vw >= 1000;
+    const why = !h ? "no [data-wow] element: tool mode needs the product's own data object declared with data-wow"
+      : h.w < T.wow_w || h.h < T.wow_h ? `hero object ${Math.round(h.w * 100)}% x ${Math.round(h.h * 100)}% of the first viewport, needs >= ${T.wow_w * 100}% x ${T.wow_h * 100}%`
+      : h.listy && h.marks < T.marks ? "hero object is a table/list: that is a panel, not a drawn data object (wow.md step 3)"
+      : !(h.top < 1) ? "hero object starts below the first viewport"
+      : h.marks < T.marks ? `hero object drawn from ${h.marks} records/marks, needs >= ${T.marks} (a real record shape, not a sketch)` : "";
+    const ratio = m.median ? m.big / m.median : 0;
+    return {
+      wow_visible: { hero: h, reason: why, hit: desk && !!why },
+      type_scale: { ratio: +ratio.toFixed(1), display_vw: +(m.big / m.vw).toFixed(3), hit: desk && (ratio < T.ratio || m.big < m.vw * T.display_vw) },
+      scale_change: { count: m.breaks, hit: desk && m.breaks < T.breaks },
+    };
+  };
+  if (typeof document === "undefined") { if (typeof module !== "undefined") module.exports = { TH, toolGates }; return; }
+  const MODE = window.__TELLS_MODE || "marketing";
+  if (MODE !== "marketing" && MODE !== "tool") return { error: "UNVERIFIED: unknown tells mode " + JSON.stringify(MODE) + " (use marketing or tool)" };
   const vis = (e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none" && +s.opacity > 0; };
   const sections = [...document.querySelectorAll("main > section, main > div > section, body > section")].filter(vis);
   const name = (e) => e.id || e.getAttribute("aria-labelledby") || e.className.toString().slice(0, 20) || e.tagName;
@@ -137,14 +166,30 @@
   const fs = [...document.querySelectorAll("main *")].filter((t) => vis(t) && [...t.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((t) => parseFloat(getComputedStyle(t).fontSize));
   const body = fs.sort((a, b) => a - b)[Math.floor(fs.length / 2)] || 16, big = Math.max(...fs, 0);
   out.type_scale = { ratio: +(big / body).toFixed(1), hit: vw >= 1000 && big / body < 4 }; // desktop only: 390 viewports compress display type
-  // wow_visible: a canvas/svg/video/img >= 50% of viewport width and >= 40% of viewport height must start inside the first viewport (the wow is above the fold).
+  // wow_visible (marketing): a canvas/svg/video/img >= 25% of viewport width and >= 30% of viewport height must start inside the first viewport (the wow is above the fold). (Comment said 50% x 40% until 2026-10-05; the code was always 25% x 30%, wow.md agrees with the code. Tool mode enforces 50% x 40%.)
   const first = [...document.querySelectorAll("canvas, svg, img, video, picture, [data-wow], section, header, div")].some((e) => { if (!vis(e)) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); const media = /^(CANVAS|SVG|IMG|VIDEO|PICTURE)$/i.test(e.tagName) || e.hasAttribute("data-wow") || cs.backgroundImage.includes("url("); return media && r.width >= vw * 0.25 && r.height >= innerHeight * 0.3 && r.top < innerHeight * 0.75 && r.top + scrollY >= 0 && r.top + scrollY < innerHeight; });
   out.wow_visible = { hit: vw >= 1000 && !first }; // desktop only; 390 is judged from the critic frames
+  if (MODE === "tool") { // dense tools have no h1 hero: score the data object, one display numeral and one full-bleed break instead (wow.md "Tool mode")
+    const T = TH.tool, vh = innerHeight, all = [...document.querySelectorAll("body *")].filter(vis);
+    const area = (e) => { const r = e.getBoundingClientRect(); return r.width * r.height; };
+    const wowEl = [...document.querySelectorAll("[data-wow]")].filter((e) => vis(e) && e !== document.documentElement && e !== document.body).sort((a, b) => area(b) - area(a))[0];
+    const hero = wowEl && (() => { const r = wowEl.getBoundingClientRect(); const shapes = wowEl.querySelectorAll("path, rect, circle, line, polyline, polygon, ellipse").length, listy = !!wowEl.closest("table, ul, ol") || !!wowEl.querySelector("table, ul, ol");
+      const marks = listy ? shapes : Math.max(+wowEl.getAttribute("data-records") || 0, shapes); // drawn marks only; a table/list tagged data-wow is not a data object
+      return { w: +(r.width / vw).toFixed(2), h: +((Math.min(r.bottom, vh) - Math.max(r.top, 0)) / vh).toFixed(2), top: +((r.top + scrollY) / vh).toFixed(2), marks, listy }; })();
+    const txt = all.filter((t) => [...t.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((t) => parseFloat(getComputedStyle(t).fontSize)).sort((a, b) => a - b);
+    const docH = document.documentElement.scrollHeight, bodyBg = getComputedStyle(document.body).backgroundColor;
+    const breaks = all.filter((e) => { const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+      const drawn = /^(IMG|CANVAS|VIDEO|svg)$/i.test(e.tagName) || cs.backgroundImage !== "none";
+      const ground = cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== bodyBg && r.height < docH * 0.9; // not the app shell
+      const big = parseFloat(cs.fontSize) >= vw * 0.12 && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      return ((drawn || ground) && r.left <= 2 && r.right >= vw - 2 && r.height >= 160) || big; }).length; // edge to edge: a 96%-wide card inside the page gutters is not a bleed
+    Object.assign(out, toolGates({ vw, hero, big: txt[txt.length - 1] || 0, median: txt[Math.floor(txt.length / 2)] || 16, breaks }, T));
+  }
   const craftKeys = ["panel_run", "scale_change", "type_scale", "wow_visible"];
   const craft_fail = craftKeys.filter((k) => out[k].hit);
 
   const hits = Object.entries(out).filter(([k, v]) => v.hit && !craftKeys.includes(k)).map(([k]) => k);
   // Calibration: see references/rubric.md "Templaty tells" (pinned rejected pages >= 4, approved pages <= 3).
   // So: >= 4 hits = templaty (fail), 3 = look hard, <= 2 = no structural tells (still needs the visual critic).
-  return { sections: sections.length, hits, templaty: hits.length >= 4, craft_fail, tells: out };
+  return { mode: MODE, desktop_gates: vw >= 1000, sections: sections.length, hits, templaty: hits.length >= 4, craft_fail, tells: out };
 })();
