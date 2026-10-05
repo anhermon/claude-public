@@ -10,18 +10,30 @@ wow_visible = `craft_fail`, which fails the page) and the critic.
 Write: "Left alone this page becomes ___" and list 4 things you will change. Known genre attractors:
 - **dev-tool dark**: graphite ground, hairline-bordered mono panels, one orange/green accent, 01/02/03 steps, file-tree box.
   Escape: change the ground (a light/paper or saturated-muted hero field), put the product at 50%+ width not in a card,
-  use display type >= 8vw somewhere, replace panels by drawn figures that bleed to the viewport edge.
+  use display type at 7vw or more somewhere (guidance, see section 2), replace panels by drawn figures that bleed to the viewport edge.
 - **data-docs**: tables + bar lists + chips. Escape: one navigable visual field (all N items as one map/grid), tables only for evidence.
 - **SaaS-centred**: centred H1, two buttons, logo row, three cards. Escape: asymmetric hero, product as hero.
+- **dashboard / run-view** (tool mode): hero card + stat bar + side panel + table; KPI-tile rows (big number, delta
+  chip, sparkline); sidebar + topbar admin chrome; donut and line-chart cards in a 2x2 or 3-up grid.
+  Escape: make the product's own record the hero object (the run drawn as lanes, the inventory as one cell grid) and
+  give it >= 50% of the working area, scale per wow.md "Tool mode"; replace the tile row with one drawn structure of
+  the real data (every item placed, one finding as a display numeral); drop the sidebar to a slim rail or a command
+  bar and let a ground change, not a card border, separate regions; swap decorative donut/line cards for the one
+  chart that answers the screen's question, annotated with real values and thresholds; treat density (tabular
+  numerals, small multiples, real units) as the material instead of padding it out with whitespace. Tables remain only as evidence under the figure.
 - **editorial-serif-beige**, **gradient-glass**, **terminal-cliche**: see SKILL.md anti-patterns.
 If your recipe's "Direction" line equals the genre attractor, you have not chosen a direction.
 
 ## 2. Section-craft numbers (all measurable)
 
+(Tool mode: panel, scale-change, type-scale and wow gates still run; apply them per view, and take the wow
+placement and scale from wow.md "Tool mode". Do not drop one because the screen is dense; if a gate cannot be met
+by the structure of the tool, stop and ask.)
+
 - No more than **3 consecutive** sections whose main content is a bordered/filled box (`panel_run`). Mono panels: max 1 per page.
 - At least **2 scale-change sections** below the hero (`scale_change`): edge-to-edge drawn figure, a contrasting full-width
   ground, or display type >= 12vw. Not "the same column with a bigger heading".
-- **Type scale**: largest text >= 4x median text (`type_scale`); the h1 or one numeral >= 7vw at 1440.
+- **Type scale**: largest text >= 4x median text (`type_scale`); this ratio is what tells.js enforces (tool mode adds >= 4vw, wow.md "Tool mode"). Guidance, not measured: the marketing h1 or one numeral at about 7vw (100px) or more at 1440.
 - **One real data-driven visual** per page that is not decoration: built from the product's measured data (all 80 items
   placed, each drawn from its record), with a legend and an honest count. Decorative gradients do not count.
 - **Real motion tied to meaning**: motion shows a state change of the data (offset closing, a count running, a segment

@@ -14,6 +14,19 @@
 
 - Mods are unsandboxed. This one reads/writes only `.premium-web/` in the project, serves candidate folders on 127.0.0.1 via `python3 -m http.server`, and makes no other network calls. See the plugin README.
 
+## [premium-web 1.1.0] — 2026-10-05
+
+### Added
+
+- **Tool mode** — premium-web now covers application and tool UIs (dashboards, admin screens, run/trace views): the wow is the product's own data object drawn at scale (>= 50% x 40% of the viewport, >= 12 records), one display numeral (>= 4vw) and one edge-to-edge scale change. Gates: `MODE=tool` for `tells.js` (via `chrome-shot.mjs`) and `MODE=tool` / `--mode tool` for `critic.py`. Marketing-mode thresholds are unchanged.
+- Measured tool-UI exemplars (`references/tool-ui-exemplars.md`) and six tool-UI gallery anchors; `scripts/test_tells.js` offline self-check.
+- A gate that cannot run is reported `UNVERIFIED`, never pass; the skill states a mandatory pre-flight and forbids reduced workflows.
+
+### Changed
+
+- The skeleton face is Hanken Grotesk (OFL) instead of the now-banned Inter.
+- Docs reconciled with the code: marketing wow gate is 25% x 30% (`wow_visible`), the enforced type-scale rule is the 4x ratio (the 7vw h1 is guidance), and the section pass rule is the one in `critic.py` (explanatory visual >= 4, nothing below 3, at most two 3s).
+
 ## [0.2.3] — 2026-04-07
 
 ### Fixed

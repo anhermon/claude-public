@@ -1,6 +1,6 @@
 # Premium vs placeholder: the section rubric
 
-This file is the standard. `scripts/critic.sh` pastes it into the critic's prompt verbatim, so every rule here
+This file is the standard. `scripts/critic.py` pastes it into the critic's prompt verbatim, so every rule here
 must be checkable from screenshots. Anchors live in `gallery/` (960px webp, real screenshots from our own work).
 
 ## The bar
@@ -37,8 +37,9 @@ detail (tabular numerals, real units, fine annotation, leader lines, callouts), 
 state. Absence is not minimalism.
 
 **Craft gates (tells.js `craft_fail`, fail the page)**: >3 consecutive bordered-panel sections; fewer than 2 scale-change
-sections below the hero; largest type < 4x median; no wow object >= 50% wide in the first viewport. Details and
-escape moves: references/genre-escape.md.
+sections below the hero; largest type < 4x median; no wow object >= 25% wide x 30% tall starting in the first viewport (tells.js
+`wow_visible`; 50% wide is the guidance for tool-product heroes, wow.md Placement). Tool UIs use the Tool-mode numbers
+(references/wow.md "Tool mode", `MODE=tool`). Details and escape moves: references/genre-escape.md.
 
 ## Ban list (any hit fails the section)
 
@@ -121,7 +122,7 @@ evidence:
 - Photographic or filmic imagery (halcyon's dusk sea) can carry colour: judge it by the critic, not by the number.
 
 Measure: `python3 scripts/saturation.py <shots...>` prints, per screenshot, the share of pixels that are hot
-(S > .72, V > .5) and a TOY / LOUD / ok verdict; exit 1 when the mean share of the inputs is > 0.12. Calibration
+(S > .72, V > .5) and a TOY / LOUD / ok verdict; exit 1 when the mean share of the inputs is > 0.12 (the constants PAGE_MAX 0.12 / SECTION_MAX 0.20 live in saturation.py; critic.py imports them). Calibration
 (share of screenshot area, 1440 viewport shots): approved pebble v2 0.00, halcyon v2 0.00, tracer 0.01; rejected
 ember v2 0.14 (amber slab section 0.58), ember v3 0.19 (drift section 0.64, hero 0.17). `critic.py` runs it on
 every section and on the page's wide shots, and fails a section above 0.20 or a page whose mean exceeds 0.12.
@@ -163,8 +164,8 @@ the author's own site; if one could be mistaken for the other, it fails.
 Scale mapping: 1-5 here, and 4 = 7/10 (the "7/10 and above" bar in briefs). The critic's rule is below; the old
 "all five >= 4" was unreachable for approved pages (see critic.py `verdict`).
 
-A section **passes** when every score is >= 4, explanatory_visual is present, and ban_hits is empty.
-`critic.sh` computes pass/fail itself from the scores; it does not trust a model's verdict.
+A section **passes** when explanatory_visual >= 4, no score is below 3, at most two scores are 3, explanatory_visual is present, and ban_hits is empty (plus the section saturation limit).
+`critic.py` computes pass/fail itself from the scores; it does not trust a model's verdict.
 
 ## Wow (page level, scored once, on the signature section)
 
@@ -175,6 +176,15 @@ Question: **would someone screenshot this and send it to a colleague?** Score 1-
   table, gallery: nice-not-wow-meridian-logpanel) is the 3 ceiling: good, but every log product has it.
 - 1: nothing a visitor would remember.
 Pass: >= 4, and **a wow below 4 fails the whole page regardless of every other score** (a page of 4s with a wow of 3 is a polished template: fixmap r2). Judged against the page's written acceptance test (wow.md v2). The reduced-motion / poster frame must still score >= 3 on its own (the fallback is part of the work).
+
+## Tool mode (dense tool UIs; numbers in references/wow.md "Tool mode")
+
+A tool has no h1 hero, so the "wow" and the "explanatory visual" are the product's own data object: a timeline of all items, a trace,
+a map, drawn from real records (>= 50% of the viewport width, >= 40% tall, >= 12 marks, first thing seen). Scoring in this mode:
+- hero card + KPI stat strip + side panel + table (the generic AI dashboard) = distinctiveness 1-2, wow 1-3, however tidy;
+- a small gantt/sparkline inside a card = wow 3 at most ("nice" ceiling);
+- one display numeral (>= 4vw) answering the tool's question and one edge-to-edge scale change are required, as in wow.md.
+The ban list, saturation limits and `wow >= 4` are the same as for marketing pages.
 
 ## Concrete standard: what anhermon v4 does per section (measured from frontpage-v4/after shots)
 
@@ -188,5 +198,5 @@ Pass: >= 4, and **a wow below 4 fails the whole page regardless of every other s
 
 Before -> after: commit 03364e9 (serif + mono eyebrows + italic accent, waterfall table) was rejected as
 "AI-generated looking"; v3 (Bricolage condensed, steel-slab guard photo) rejected; v4 shipped (Inter, measured
-scale, code-drawn Guard). The Meridian method section (gallery: reject-meridian-method) is what "template with
+scale, code-drawn Guard; this is the historical page of the face's one owner, anhermon.dev: Inter is banned for NEW concepts, SKILL.md and type-systems.md). The Meridian method section (gallery: reject-meridian-method) is what "template with
 stick-figure placeholders" looks like: three hairline sketches, 01/02/03, grey text.

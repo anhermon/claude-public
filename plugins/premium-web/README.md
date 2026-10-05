@@ -47,3 +47,5 @@ Limits: path checks are lexical (a symlink inside the project that points elsewh
 `.claude-plugin/plugin.json` (manifest, `candidateCount` setting) · `hooks/` (the mod) · `tests/` (run with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test .`) · `skills/premium-web/` (rubric, wow ideation, genre-escape and verification references, `references/candidates.md`; scripts for screenshots, Lighthouse, saturation and the critic; an optional image-generation MCP server).
 
 Image keys are read through [vaultlet](https://github.com/anhermon/sealref) refs only; set `IMAGEGEN_VAULT_GROUP` to your group. Never paste keys into config.
+
+The skeleton ships Hanken Grotesk (SIL OFL 1.1, licence in `assets/skeleton/fonts/`) as a placeholder face. Application and tool UIs are in scope (see SKILL.md "Application and tool UIs"); a gate that cannot run is reported UNVERIFIED, never pass.

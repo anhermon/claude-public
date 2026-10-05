@@ -1,7 +1,7 @@
 {
   "name": "premium-web",
   "version": "2.0.0",
-  "description": "Build premium, studio-quality web pages as several competing candidates you browse and pick from in a Claude Code mod pane, then finish the winner with a calibrated critic loop, a mandatory signature 'wow' moment and image generation.",
+  "description": "Build premium, studio-quality web pages and tool UIs as several competing candidates you browse and pick from in a Claude Code mod pane, then finish the winner with a calibrated critic loop, a mandatory signature 'wow' moment and image generation.",
   "author": { "name": "Angel Hermon" },
   "keywords": ["web", "design", "landing-page", "frontend", "critic", "imagegen", "mod", "candidates"],
   "userConfig": {

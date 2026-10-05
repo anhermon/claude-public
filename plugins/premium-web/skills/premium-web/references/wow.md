@@ -21,7 +21,7 @@
    concrete sentence about the product, not about style) plus 2 numeric checks (e.g. occupies >= 55% of the 1440 first
    viewport; first interaction produces a visible result in < 1.5 s with no click-through). Pass it to the critic:
    `critic.py <dir> --wow wow --wow-test "<sentence>"`.
-5. **Placement**: above the fold or the page's centrepiece. Tool/data products: >= 50% viewport width (Stripe, Linear); object
+5. **Placement**: above the fold or the page's centrepiece. Pages for tool/data products: >= 50% viewport width (Stripe, Linear; the gate is 25% x 30%, see Tool mode for tool UIs where 50% x 40% is the gate); object
    heroes may be smaller (approved pebble's clay stack is 26% wide) but never < 25% wide x 30% tall (tells.js `wow_visible`). It is the product itself (Stripe: the live checkout; Linear: the real app at full width), never a
    neighbour of a headline in a 400px box.
 6. **Poster first** (unchanged): reduced-motion frame states the claim alone.
@@ -36,12 +36,41 @@ checkout UI on the right 50% of the first viewport plus a full-bleed gradient we
 product itself or one rendered thing) in the first viewport, display type 4.5-5.5x body, ground changes or a bleed every
 1-2 screens, no row of equal panels above the fold.
 
+## Tool mode
+
+Use when the deliverable is a **tool UI** (an ops console, release board, trace viewer, dashboard-as-product), not a page that sells
+one. Why a separate mode: a dense tool has no marketing hero, so the marketing h1 guidance (about 7vw, not enforced) and "two scale-change sections below the hero" cannot be
+met by honest work, and agents answered by skipping the skill ("poor fit") and shipping the generic mockup (hero card + KPI strip +
+side panel + table), which Angel rejected as "nothing premium, out-of-the-box AI generated". Tool mode keeps the bar and moves it to
+what a tool can truthfully have. **Marketing mode and its thresholds are unchanged**; do not use tool mode for a landing page.
+
+1. **The hero is the product's own data object**: a timeline of all releases, a trace of one run, a map of all N items. Drawn from a
+   real record shape (every mark is one record: its id, state, duration; legend and an honest count), never a sketch, a sparkline in a
+   card, or a KPI strip. Declared with `data-wow` on the element; `data-records="N"` if it is a canvas. tells.js counts only drawn SVG shapes (path, rect, circle, line, polyline, polygon, ellipse) and refuses a `data-wow` that is, or sits in, a table/list; `data-records` on a canvas is self-declared, so the critic must confirm from the screenshot that the marks are real records.
+2. **Minimum size**: >= 50% of viewport width and >= 40% of viewport height, starting in the first viewport at 1440, drawn from
+   >= 12 records/marks. (Marketing: 25% x 30% as the hard gate, 50% as the guidance for tool-product heroes; tool mode makes 50% the
+   gate because there is no headline competing for the first screen, so the data object must be the first screen.)
+3. **One display-scale numeral or label** (not an h1; a tool page keeps exactly one `<h1>`, a small page/view title at UI size, and the numeral is a `<p>`/`<div>` or `<output>` with `aria-label`, never a second h1): the largest text is >= 4x the median text AND >= 4vw (58px at 1440): the one
+   number the tool exists to answer ("30 in flight", "4 blocked", "p95 412ms"). Marketing guidance (not enforced; only the 4x ratio is) is an h1 or numeral near 7vw because the h1 is
+   the hero; tool mode lowers the floor to 4vw because the numeral lives inside a dense layout, but keeps the 4x ratio.
+4. **One full-bleed scale change**: one element spanning the viewport edge to edge (drawn figure, contrasting band) >= 160px tall, or
+   type >= 12vw. Marketing needs 2 below the hero; a dense single-screen tool earns 1, but edge to edge, not a card in the gutters.
+5. **Acceptance test stays mandatory** (step 4 above): "A stranger screenshotting this would say: ___" plus numeric checks, passed
+   to `critic.py --mode tool --wow wow --wow-test "..."`. KPI strip + table around a small chart scores 1-3 at the critic.
+
+Gate: `MODE=tool EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440` and `critic.py <dir> --mode tool ...`.
+Mode-aware tells (tool mode only; marketing unchanged, test_tells.js asserts both): `equal_card_grids` skips >= 6 equal cells or cells <= 72px tall
+(repeated data/status cells; 3-5 tall equal cards still fire), `timeline_code_split` skips lists of >= 6 items (steps/runs are data), `palette` is
+one-note only with zero chromatic hues and no media (one state hue is normal). Not changed in tool mode: panel_run, the ban list, saturation limits, `wow >= 4`.
+
+<!-- tool-mode-numbers (test_tells.js asserts these equal tells.js TH.tool): wow_w=0.5 wow_h=0.4 marks=12 display_vw=0.04 ratio=4 breaks=1 -->
+
 ## Original procedure (still valid as the family list)
 
 Every page ships ONE moment a visitor would screenshot and send to someone. Not two: two compete, and the second
 one is usually a "nice" component promoted beyond its station. A competent interactive panel (filters + chart +
 table) is the **"nice" ceiling** (Meridian, gallery/nice-not-wow-meridian-logpanel): every product in the category
-has one. The critic scores this with `critic.py <dir> --wow wow` and it must reach 4/5.
+has one. The critic scores this with `critic.py <dir> --wow wow --wow-test "<sentence>"` and it must reach 4/5.
 
 ## Ideation procedure (do it in writing, log it in NOTES.md)
 
@@ -102,7 +131,7 @@ Matter.js for real rigid bodies. Load from cdnjs/jsdelivr only if self-hosting i
 (250ms to 4.5s) for a hero that animates on load or after `WOW_ACT=<js>` (a click, a replay); for a `[data-scene]`,
 beat 1 at rest, every beat boundary at 250ms and 700ms into its transition, then the end (8 frames for 4 beats); the critic scores motion polish from them (motion.md
 checklist) and fails a wow whose middle frames are messy; run it again
-with `RM=1` for the fallback frames. Then `python3 scripts/critic.py <out>/sections --wow wow`. The critic is
+with `RM=1` for the fallback frames. Add `WOW_DELAY=<ms>` (shifts all frames; ~900 for a scroll-reveal) so the first frame is after the reveal has finished. Then `python3 scripts/critic.py <out>/sections --wow wow --wow-test "<acceptance test>"`. The critic is
 asked "would someone screenshot this and send it to a colleague?" and must cite evidence. A 3 means "nice": go
 back to step 2 of the ideation, do not polish the 3.
 
