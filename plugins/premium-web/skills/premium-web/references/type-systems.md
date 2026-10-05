@@ -47,6 +47,9 @@ scripts/chrome-shot.mjs <url> <out> 1440,390`; or paste it into claude-in-chrome
 
 ## What anhermon v4 chose from them
 
+(A record of one shipped page. It used Inter before Inter was banned in rule 8: do not copy the family, use the
+measured scale and tracking logic with another face.)
+
 | token | measured references | v4 chosen |
 |---|---|---|
 | family | 1 sans for everything on all 11 (SF Pro, Söhne, Inter, Geist, NotionInter, figmaSans, Mona Sans, GDS Transport) | Inter variable, opsz 14-32 (Display cut auto at large sizes) + wght; OFL; 40KB woff2 subset |

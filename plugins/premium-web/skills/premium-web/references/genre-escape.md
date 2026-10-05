@@ -13,10 +13,22 @@ Write: "Left alone this page becomes ___" and list 4 things you will change. Kno
   use display type >= 8vw somewhere, replace panels by drawn figures that bleed to the viewport edge.
 - **data-docs**: tables + bar lists + chips. Escape: one navigable visual field (all N items as one map/grid), tables only for evidence.
 - **SaaS-centred**: centred H1, two buttons, logo row, three cards. Escape: asymmetric hero, product as hero.
+- **dashboard / run-view** (tool mode): hero card + stat bar + side panel + table; KPI-tile rows (big number, delta
+  chip, sparkline); sidebar + topbar admin chrome; donut and line-chart cards in a 2x2 or 3-up grid.
+  Escape: make the product's own record the hero object (the run drawn as lanes, the inventory as one cell grid) and
+  give it >= 50% of the working area, scale per wow.md "Tool mode"; replace the tile row with one drawn structure of
+  the real data (every item placed, one finding as a display numeral); drop the sidebar to a slim rail or a command
+  bar and let a ground change, not a card border, separate regions; swap decorative donut/line cards for the one
+  chart that answers the screen's question, annotated with real values and thresholds; treat density (tabular
+  numerals, small multiples, real units) as the material instead of padding it out with whitespace. Tables remain only as evidence under the figure.
 - **editorial-serif-beige**, **gradient-glass**, **terminal-cliche**: see SKILL.md anti-patterns.
 If your recipe's "Direction" line equals the genre attractor, you have not chosen a direction.
 
 ## 2. Section-craft numbers (all measurable)
+
+(Tool mode: panel, scale-change, type-scale and wow gates still run; apply them per view, and take the wow
+placement and scale from wow.md "Tool mode". Do not drop one because the screen is dense; if a gate cannot be met
+by the structure of the tool, stop and ask.)
 
 - No more than **3 consecutive** sections whose main content is a bordered/filled box (`panel_run`). Mono panels: max 1 per page.
 - At least **2 scale-change sections** below the hero (`scale_change`): edge-to-edge drawn figure, a contrasting full-width
