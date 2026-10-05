@@ -1,6 +1,6 @@
 ---
 name: premium-web
-description: Build premium, studio-quality web pages (landing, product, portfolio, marketing, concept pages) for any subject, and redesign existing ones. Use when asked to "build a premium page", "landing page", "portfolio page", "marketing site", "redesign the site", "make it look less AI-generated / less templaty", or "add a wow factor". Encodes measured type rules, section-level craft standards, a mandatory signature-moment ("wow") ideation with acceptance test, genre-escape rules, imagery via an image-generation MCP, and a mandatory screenshot + calibrated-critic loop that fails templaty pages even when Lighthouse is 100.
+description: Build premium, studio-quality web pages (landing, product, portfolio, marketing, concept pages) for any subject, and redesign existing ones. By default builds several materially different candidates (3, configurable) and lets the user browse, pick or send feedback in a Claude Code mod pane before finishing the winner. Use when asked to "build a premium page", "landing page", "portfolio page", "marketing site", "redesign the site", "make it look less AI-generated / less templaty", or "add a wow factor". Encodes measured type rules, section-level craft standards, a mandatory signature-moment ("wow") ideation with acceptance test, genre-escape rules, imagery via an image-generation MCP, and a mandatory screenshot + calibrated-critic loop that fails templaty pages even when Lighthouse is 100.
 ---
 
 # Premium web pages
@@ -11,6 +11,33 @@ fonts loaded) are necessary and prove nothing about premium: ember had all of th
 templaty". A calibrated critic, not the builder, decides when a page is done.
 
 Paths below are relative to this skill dir (`~/.claude/skills/premium-web`).
+
+## Candidates first (default since 2.0)
+
+A premium page is a taste decision, and one build gives the user nothing to choose between. So by default this
+skill builds **N materially different candidates**, shows them in the **Premium candidates** pane of the
+`premium-web` mod, and finishes only the one the user picks. Full protocol, file schema and fallback:
+`references/candidates.md`. In short:
+
+1. **Decide N.** The user's explicit number in the request wins ("5 options", "just one"); otherwise call the
+   `premium_web_get_settings` tool (mod) and use its `candidateCount`; otherwise 3. Cap 6 (say so if they asked for more).
+   N = 1 skips this flow: run steps 1-9 below once, no pane.
+2. **Intake and references once** (steps 1-2), shared by all candidates.
+3. **Write N directions** (steps 3-5 in short form) that pass the distinctness gate in `references/candidates.md`
+   section 2: different style recipe, palette family, type voice, layout shape AND a different signature wow family
+   each (wow.md; genre-escape.md applies to every candidate). Near-duplicates are the failure mode, not a spare.
+4. **Build the N candidates in parallel**, one agent each, in its own folder `.premium-web/build/<id>/` (or a
+   worktree), each in a bounded time box, checkpointing to `<folder>/NOTES.md` as it goes. Never fork; give each
+   agent its direction, the tokens, the proof inventory and the acceptance test for its wow.
+5. **One critic pass per candidate** (step 9 gates 1-3, a single round, not the full iterate-to-green loop).
+   Record the scores; do not spend the iteration budget on candidates the user may discard.
+6. **Write `.premium-web/candidates.json` and screenshots**, then call `premium_web_present_candidates` (or tell the user
+   to run `/candidates`) and **STOP**. Wait for the user's pick or feedback, which arrives as their next message.
+7. **Feedback** ("Feedback on candidate B: ...") -> iterate that candidate only; ("Feedback on all candidates: ...") ->
+   iterate all. Bump `round`, refresh screenshots, present again. **Pick** ("I picked candidate C") -> take only that
+   candidate through the full step-9 loop (all three gates, iterate to green), then deliver. Drop the others.
+8. **Mod unavailable** (Claude Code < 2.1.287, mods disabled, non-interactive, the tools are missing or return an
+   error): use the chat fallback in `references/candidates.md` section 6 and still STOP for the user's pick.
 
 ## Workflow
 
@@ -92,6 +119,7 @@ OG/JSON-LD, poster + canvas hero) and restyle it to the direction; do not ship i
 - a11y/SEO/OG: verification.md last section.
 
 ### 9. Verify: three gates (verification.md). Do not report done before all three pass.
+In candidates mode this runs once per candidate during a round (record, do not iterate to green), and to green for the picked candidate only.
 1. **Works**: `scripts/serve.mjs` -> `scripts/shoot.sh` (Chrome 1440 + 390 and real Mobile Safari on a private
    Simulator) -> `scripts/lighthouse.sh`. No horizontal scroll, fonts rendered, no console errors, trackers blocked.
 2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (+ `RM=1` for
@@ -169,6 +197,8 @@ PASS = gate; WEAK = needs a human ear; FAIL = fix the sound. Use clips >= 10 s (
 | scripts/measure-site.js, tells.js, saturation.py | computed-style measurement (SUMMARY=1 for the short form); templaty-tells DOM scan (`data-tell-ok` marks deliberate repeats); hot-pixel saturation meter |
 | scripts/critic.py | calibrated section/wow/page critic, pass/fail JSON |
 | scripts/gen-image.sh, optimize-images.sh, get-font.sh | image generation and AVIF/WebP; self-hosted fonts |
+| references/candidates.md | the candidates protocol: N rules, distinctness gate, folder layout, `candidates.json` schema, feedback loop, chat fallback |
+| hooks/register.ts, hooks/lib.ts (plugin root, not this dir) | the `premium-web` mod: `/candidates` pane, `premium_web_present_candidates`, `premium_web_get_settings` tools |
 | mcp/imagegen/ | the premium-web-imagegen MCP server (server.py, core.py, api_call.py, test_core.py); providers incl. local fallback |
 | ~/dev/freemium-demo-kit, ~/dev/audio-judge, ~/dev/local-imagegen | external tools for steps 10, 11 and the local image fallback (referenced, not copied) |
 | assets/skeleton/ | generic starting site; assets/recipes/ scroll-scene.js, particles.js |

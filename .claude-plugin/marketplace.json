@@ -205,8 +205,8 @@
     },
     {
       "name": "premium-web",
-      "description": "Build premium, studio-quality web pages with a calibrated critic loop, mandatory signature wow moment, section-level rubric and image generation.",
-      "version": "1.0.0",
+      "description": "Build premium, studio-quality web pages as several competing candidates you browse and pick from in a Claude Code mod pane (requires Claude Code 2.1.287+ for the mod), then finish the winner with a calibrated critic loop, mandatory signature wow moment, section-level rubric and image generation.",
+      "version": "2.0.0",
       "author": {
         "name": "Angel Hermon"
       },
