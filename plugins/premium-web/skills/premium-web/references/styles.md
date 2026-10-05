@@ -15,6 +15,8 @@ type-systems.md and never reuse a face another concept in the same portfolio own
 | cinematic / creative | yes: full-bleed film stills, one per section, one light direction | specs tables, controls | yes: hero shader or audio-reactive |
 | editorial dark product (anhermon) | 4:5 plates with real data labels overlaid | proof figures (allowlists, diffs) | hero |
 | blueprint / engineering | no | isometric drawings, dimension lines, parts lists, revision blocks | optional |
+| tool UI: record-as-landscape (run/trace/log/inventory views) | no (screens show real data, never plates) | the whole record set drawn from its fields, annotated, with the table as evidence | no |
+| tool UI: working surface (admin, queue, editor, settings) | no | the live object and its states; real rows, real empty/error states | no |
 
 Code-drawn diagrams beat photos for every technical claim (the steel-slab guard lesson, imagery.md).
 
@@ -74,11 +76,34 @@ page does at least three of these:
 
 ## Editorial dark product (anhermon v4, shipped)
 
-- One neutral sans (Inter opsz) at a measured scale, dark default, one blue accent, generated 4:5 plates with real
+- One neutral sans at a measured scale, dark default, one blue accent, generated 4:5 plates with real
   data labels, code-drawn proof figures, WebGL hero with honest caption. See rubric.md per-section table.
+  (anhermon v4 shipped in Inter before Inter was banned; do not copy the family into a new concept.)
 
 ## Blueprint / engineering
 
 - Cobalt-to-ink ground (not neon on black), white and pale-cyan linework, drafting grid, dimension lines, callouts,
   parts-list tables, isometric exploded diagrams, stamped revision blocks. Condensed/technical display (Big Shoulders,
   Archivo Narrow) + a mono for callouts.
+
+## Tool UI: record as landscape (run, trace, log, inventory, queue views)
+
+For screens whose job is reading many records. Pair with SKILL.md "Application and tool UIs" and wow.md "Tool mode".
+- The hero object is the data itself: every record placed once and drawn from its own fields (a run as a lane of
+  spans scaled by duration, an inventory as a grid of cells coloured by state, a queue as items at their real age),
+  at a scale that fills the working area, with a legend and an honest count. The table sits beneath as evidence, not
+  as the design.
+- Chrome recedes: one slim top bar, no KPI tile row, no decorative card borders; groups are separated by ground
+  change, spacing and type weight, not boxes. Selecting a record opens its detail in place (same object, zoomed).
+- Density is the material: tabular numerals, real units, 12-13px data text with one 3-4x display numeral that states
+  the screen's single finding. Type: one sans family, mono only for ids/paths/values.
+- Colour: neutral ground, one signal hue plus one status hue, each meaning one thing, explained once.
+- Fails as: hero card + stat bar + side panel + table (the attractor, genre-escape.md section 1).
+
+## Tool UI: working surface (admin, editor, settings, review queue)
+
+- One primary object (the thing being edited or decided) holds >= 50% of the width; controls hang off it, not beside
+  it in equal boxes. Show the object's real states: loading, empty, error, partial, over-limit.
+- A decision area states the consequence of each action in data terms ("moves 14 items, 2 fail validation") before
+  commit. Keyboard path and focus ring are part of the design.
+- Fails as: a sidebar + topbar + grid of equal cards with a donut and a line chart (admin-template default).

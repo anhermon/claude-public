@@ -58,6 +58,15 @@ python3 scripts/critic.py <out>/sections --wow wow   # every section + the signa
   code-drawn Guard passes 4-5; wow v4 hero 4, Meridian panel 3; pages ember/meridian fail, pebble/halcyon pass.
   The critic is stricter than what shipped on the anhermon observe plate (whitespace): treat it as the bar.
 
+## A gate that cannot run: report UNVERIFIED
+
+No Chrome/CDP (chrome-shot, tells.js, shoot.sh), no `claude`/`codex` session, quota or network (critic.py exit 3),
+no Xcode (Simulator), no Lighthouse: that gate's result is `UNVERIFIED: <gate>: <reason>`, in NOTES.md and in the
+reply, next to the gates that did run. Never report it as pass, never say the page is premium or done, never
+substitute functional checks, a manual read or self-scoring for it. Fix the cause (start Chrome, wait for the quota
+reset, run it where a session exists) or hand that gate to the user. Paste each gate's real output (tells hits,
+saturation mean, critic.json summary) into the report; a gate without pasted output counts as not run.
+
 ## Then: LOOK yourself
 
 Read every screenshot (sections, wow frames, Safari). Generic checklist per shot: does it look like a template? Is
