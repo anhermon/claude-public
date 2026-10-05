@@ -1,5 +1,17 @@
 # Changelog
 
+## [premium-web 2.1.0] — 2026-10-06
+
+### Added
+
+- **Step 0: use-case classification.** READ (marketing), WORK (`app`) or MIXED (split into two scoped deliverables), written with evidence to NOTES.md; `scripts/classify.py` makes `chrome-shot.mjs` and `critic.py` refuse to run without it (exit 4). The skill description and triggers now cover dashboards, admin, internal tools and consoles and say marketing mode is wrong for them.
+- **App mode** (`--mode app`, `tool` kept as an alias): success is task speed and clarity. Primary tasks and walk-through step counts, structure rules, a "signature clarity" idea in place of the wow, a `tells.js` app profile (adds `density`, `interactive_affordance`, `state_coverage`, `page_shaped_mismatch`; `type_scale`, `wow_visible`, `scale_change`, `panel_run` are not hard fails; `data-wow` is a violation) and a per-screen/per-flow critic rubric. New: `references/app-mode.md`, `rubric-app.md`, `app-exemplars.md` (measured; unmeasurable products listed as not measured), three gallery anchors, `assets/skeleton/app-shell.html`.
+- Candidates in app mode are working prototypes; `candidates.json` gains `tasks` (`{task, steps, result, screenshot?}`) and `mode`, shown in the pane and chat fallback.
+
+### Changed
+
+- Faces reconciled in one table in `references/styles.md`; `tokens-tool.css` is now `tokens-app.css`. Marketing-mode thresholds and verdicts are unchanged (regression before/after identical).
+
 ## [Unreleased]
 
 ### Changed
