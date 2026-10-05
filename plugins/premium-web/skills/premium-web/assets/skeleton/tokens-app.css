@@ -1,10 +1,14 @@
-/* Tool-mode tokens: LIGHT is the default and the only theme unless you add one (a tool is judged on the screen the user
-   opens, not the OS scheme). Load INSTEAD of tokens.css for a tool UI (SKILL.md "Tool mode"); same variable names, so
-   site.css / form.css keep working. Restyle: swap --paper/--ink/--accent for your subject (the acceptance run used
-   paper #F2F3F0, ink #14181B, vermilion fail, teal selection). Colour is for STATE only: --ok/--warn/--fail plus ONE
-   --accent for selection; chromatic hues in view <= 3 (tool-ui-exemplars.md), hot-pixel share < 2% (saturation.py).
+/* App tokens (mode app; formerly tokens-tool.css): LIGHT is the default and the only theme unless you add one (an app is judged on the screen the user
+   opens, not the OS scheme). Load INSTEAD of tokens.css for an app UI (SKILL.md "App mode"); same variable names, so
+   site.css / form.css keep working, and app-shell.html is a starting shell built on it. Restyle: swap --bg/--text/--accent for your subject. Colour is for STATE only:
+   --ok/--warn/--fail plus ONE --accent for selection; chromatic hues in view <= 3 (app-exemplars.md), hot-pixel share < 2% (saturation.py).
    Every --text/--dim/--faint pair below is >= 4.5:1 on --bg and --surface. Add a dark island with `.theme-dark` only
    where the product needs it (e.g. a log drawer); it keeps its own tokens regardless of the page theme. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url(fonts/hanken-grotesk-latin-wght-normal.woff2) format("woff2"); /* OFL-1.1 placeholder face, licence in fonts/LICENSE-hanken-grotesk.txt: swap it (styles.md "Faces") */
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
 :root {
   color-scheme: light;
   --bg: #F4F5F2; --surface: #ECEEE9; --surface-2: #E1E4DE;
@@ -18,10 +22,10 @@
   --sans: "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; /* ids, paths, logs only */
 
-  /* tool scale: UI 12-14px, ONE display numeral (>= 4x median text and >= 4vw; tells.js tool gate) */
+  /* app scale (styles.md "App type"): data and UI 12-14px, view title 16-18px, tabular numerals on every number. No display numeral is required or gated. */
   --fs-ui: 13px; --fs-small: 12px; --fs-body: 14px; --lh-body: 1.45; --tr-body: 0;
-  --fs-h2: 16px; --fs-h3: 14px;
-  --fs-numeral: clamp(56px, 6.1vw, 96px);                 /* the one answer the tool exists to give; a <p>/<div>, not a 2nd h1 */
+  --fs-h2: 16px; --fs-h3: 14px; --fs-title: 18px;
+  --row-h: 36px;                                           /* compact rows; two-line rows 64-72px (app-mode.md "density") */
   --gut: clamp(16px, 2.5vw, 32px);
   --r: 4px; --r-lg: 6px;
   --ease: cubic-bezier(.2, 0, 0, 1);

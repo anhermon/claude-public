@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deploys (sample data)</title>
+<!-- App shell starting point (SKILL.md "App mode"): persistent nav + a work surface in the first viewport, no hero, no sections, no closing CTA.
+     Replace the sample rows with your product's real object, keep: tabular numerals, mono ids, named controls, focusable rows, the four data-state hooks with real copy,
+     data-screen="form|detail|editor" on <main> for screens with no list. Do NOT add data-wow. Build it, then walk each primary task in the real UI. -->
+<link rel="stylesheet" href="tokens-app.css">
+<style>
+  body { margin: 0; font: 400 var(--fs-body)/var(--lh-body) var(--sans); display: grid; grid-template-columns: 208px 1fr; height: 100vh; overflow: hidden; }
+  nav { background: var(--surface); border-right: 1px solid var(--rule); padding: 12px 8px; }
+  nav a { display: block; padding: 6px 10px; border-radius: var(--r); color: var(--dim); text-decoration: none; min-height: 24px; }
+  nav a[aria-current] { background: var(--surface-2); color: var(--text); font-weight: 600; }
+  main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  header { display: flex; gap: 8px; align-items: center; padding: 8px var(--gut); border-bottom: 1px solid var(--rule); }
+  h1 { font-size: var(--fs-title); margin: 0 auto 0 0; font-weight: 600; } h1 small { font-size: var(--fs-small); font-weight: 400; color: var(--faint); }
+  input, button { font: inherit; min-height: 28px; border: 1px solid var(--rule-2); border-radius: var(--r); background: var(--bg); color: var(--text); padding: 0 10px; }
+  input[type=search] { width: 280px; } .id { vertical-align: middle; }
+  button { background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .pane { overflow: auto; flex: 1; }
+  table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 0 var(--gut); height: var(--row-h); border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  th { font-weight: 600; color: var(--dim); position: sticky; top: 0; background: var(--bg); }
+  .num { font-variant-numeric: tabular-nums; } .id { font-family: var(--mono); font-size: var(--fs-small); } .ok { color: var(--ok); } .bad { color: var(--fail); font-weight: 600; }
+  tr[data-row]:hover { background: var(--surface); } [data-state] { margin: 0; padding: 12px var(--gut); color: var(--dim); }
+</style>
+<nav aria-label="Primary"><a href="#deploys" aria-current="page">Deploys</a><a href="#rollbacks">Rollbacks</a><a href="#services">Services</a><a href="#settings">Settings</a></nav>
+<main data-screen="list">
+  <header><h1>Deploys <small>sample data</small></h1><input type="search" aria-label="Filter deploys" placeholder="Filter by id, service or state"><button type="button">Roll back</button></header>
+  <div class="pane">
+    <table><thead><tr><th>Deploy</th><th>Service</th><th>State</th><th>Duration</th><th>Started</th></tr></thead><tbody>
+      <tr data-row tabindex="0"><td class="id">d-4139</td><td>api</td><td class="ok">ok</td><td class="num">38 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4138</td><td>web</td><td class="ok">ok</td><td class="num">45 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4137</td><td>billing</td><td class="bad">failed</td><td class="num">52 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4136</td><td>search</td><td class="ok">ok</td><td class="num">59 s</td><td class="num">3 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4135</td><td>api</td><td class="ok">ok</td><td class="num">66 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4134</td><td>web</td><td class="ok">ok</td><td class="num">73 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4133</td><td>billing</td><td class="ok">ok</td><td class="num">80 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4132</td><td>search</td><td class="bad">failed</td><td class="num">87 s</td><td class="num">3 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4131</td><td>api</td><td class="ok">ok</td><td class="num">94 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4130</td><td>web</td><td class="ok">ok</td><td class="num">101 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4129</td><td>billing</td><td class="ok">ok</td><td class="num">108 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4128</td><td>search</td><td class="ok">ok</td><td class="num">115 s</td><td class="num">3 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4127</td><td>api</td><td class="bad">failed</td><td class="num">122 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4126</td><td>web</td><td class="ok">ok</td><td class="num">129 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4125</td><td>billing</td><td class="ok">ok</td><td class="num">136 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4124</td><td>search</td><td class="ok">ok</td><td class="num">143 s</td><td class="num">3 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4123</td><td>api</td><td class="ok">ok</td><td class="num">150 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4122</td><td>web</td><td class="bad">failed</td><td class="num">157 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4121</td><td>billing</td><td class="ok">ok</td><td class="num">164 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4120</td><td>search</td><td class="ok">ok</td><td class="num">171 s</td><td class="num">3 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4119</td><td>api</td><td class="ok">ok</td><td class="num">178 s</td><td class="num">2 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4118</td><td>web</td><td class="ok">ok</td><td class="num">185 s</td><td class="num">14 min ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4117</td><td>billing</td><td class="bad">failed</td><td class="num">192 s</td><td class="num">1 h ago</td></tr>
+      <tr data-row tabindex="0"><td class="id">d-4116</td><td>search</td><td class="ok">ok</td><td class="num">199 s</td><td class="num">3 h ago</td></tr>
+    </tbody></table>
+    <p data-state="empty" hidden>No deploys match this filter. Clear the filter to see all 412 deploys.</p>
+    <div data-state="loading" aria-busy="true" hidden></div>
+    <p data-state="error" hidden>Could not load deploys: the history service timed out. Retry; the rows above are still current as of 2 min ago.</p>
+    <p data-state="partial" hidden>Showing 24 of 412 deploys; 3 services did not answer and are missing.</p>
+  </div>
+</main>
+</html>
