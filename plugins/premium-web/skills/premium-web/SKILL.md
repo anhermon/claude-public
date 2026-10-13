@@ -28,7 +28,8 @@ claude-in-chrome) and tabulate h1/h2/body/header/button/section padding/motion. 
 
 ### 3. Direction and type (styles.md, type-systems.md)
 - Choose ONE style recipe from the subject: Swiss/data, terminal-native, tactile consumer, cinematic, editorial
-  dark product, blueprint. Follow its "material by style" row: which sections get generated images, which get
+  dark product, blueprint, e-commerce storefront (any page that sells goods: campaign concept, packshots trimmed onto
+  one plate, on-site quick view, never link products out; Angel's 7 references in styles.md). Follow its "material by style" row: which sections get generated images, which get
   code-drawn figures, whether WebGL is in play.
 - One family carries the page; a second face only as a deliberate voice; mono for code/data only; sentence case.
 - **Palette = restraint** (rubric.md "Saturation and restraint"): large fields neutral or low-chroma (paper, stone,
@@ -94,7 +95,7 @@ OG/JSON-LD, poster + canvas hero) and restyle it to the direction; do not ship i
 ### 9. Verify: three gates (verification.md). Do not report done before all three pass.
 1. **Works**: `scripts/serve.mjs` -> `scripts/shoot.sh` (Chrome 1440 + 390 and real Mobile Safari on a private
    Simulator) -> `scripts/lighthouse.sh`. No horizontal scroll, fonts rendered, no console errors, trackers blocked.
-2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (+ `RM=1` for
+2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (one width per call with SECTIONS=1; `1440,390` crashed on 2026-10-13; a scroll-scrubbed wow needs `data-scene` on the WOW element to get scroll frames instead of time frames) (+ `RM=1` for
    the fallback frames; `WOW_ACT=<js>` to start an interaction). WOW frames are mid-animation (7 time / 6 scroll
    positions). 4+ structural tells = fail. Then `python3 scripts/saturation.py <out>/*.png`: mean hot-pixel share
    > 0.12 = toy palette = fail (approved pages 0.00-0.01, rejected ember v3 0.19).

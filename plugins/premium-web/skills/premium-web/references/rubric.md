@@ -148,6 +148,8 @@ the author's own site; if one could be mistaken for the other, it fails.
 | nice-not-wow-meridian-logpanel | NICE, NOT WOW | "it's nice, but it's missing a wow factor": competent log panel every log product has |
 | reject-anhermon-03364e9-serif-mono | REJECTED | serif + mono eyebrows + italic accent word: read as AI-generated |
 | reject-guard-steel-slab | REJECTED | "this image is weird": literal metaphor photo; replaced by the code-drawn allowlist |
+| reject-provenant-gold-plate | REJECTED | "looks terrible - you don't create a luxurious feeling by writing 'luxury' or putting the price at the front, or covering everything with gold"; "show real products, not concept": brass plate hero with price range as the headline, concept marks instead of goods (styles.md luxury retail) |
+| reject-provenant-v2-beige-boxes | REJECTED | "it still doesn't look good": warm paper + Cormorant default, small packshots floating in large beige boxes (one box rendered empty), beige-on-beige, product links sending buyers to the supplier, two off-story products; no campaign concept, no discovery path (styles.md e-commerce) |
 | reject-thin-line-art | REJECTED | generated hairline diagram: says nothing, same disease as the Meridian method sketches |
 
 ## Scores (1-5, each with visible evidence)

@@ -140,6 +140,9 @@
   // wow_visible: a canvas/svg/video/img >= 50% of viewport width and >= 40% of viewport height must start inside the first viewport (the wow is above the fold).
   const first = [...document.querySelectorAll("canvas, svg, img, video, picture, [data-wow], section, header, div")].some((e) => { if (!vis(e)) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); const media = /^(CANVAS|SVG|IMG|VIDEO|PICTURE)$/i.test(e.tagName) || e.hasAttribute("data-wow") || cs.backgroundImage.includes("url("); return media && r.width >= vw * 0.25 && r.height >= innerHeight * 0.3 && r.top < innerHeight * 0.75 && r.top + scrollY >= 0 && r.top + scrollY < innerHeight; });
   out.wow_visible = { hit: vw >= 1000 && !first }; // desktop only; 390 is judged from the critic frames
+  // storefronts (styles.md e-commerce rule 5): product cards carry [data-product]; a link from one to another origin sends the buyer away
+  const outLinks = [...document.querySelectorAll("[data-product] a[href]")].filter((a) => a.origin && a.origin !== location.origin);
+  out.product_links_out = { count: outLinks.length, examples: outLinks.slice(0, 3).map((a) => a.href), hit: outLinks.length > 0 };
   const craftKeys = ["panel_run", "scale_change", "type_scale", "wow_visible"];
   const craft_fail = craftKeys.filter((k) => out[k].hit);
 
