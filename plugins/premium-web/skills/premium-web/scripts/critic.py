@@ -25,7 +25,7 @@ CRIT = ["distinctiveness", "explanatory_visual", "density_detail", "hierarchy", 
 PASS_REFS = ["accept-anhermon-v4-guard-codedrawn.webp", "approved-pebble-jar-maths.webp", "approved-halcyon-instrument.webp"]
 FAIL_REFS = ["reject-meridian-method.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-principles-cards.webp", "reject-thin-line-art.webp"]  # judge_section shows the first two
 APPROVED = ["approved-pebble-hero.webp", "approved-pebble-jar-maths.webp", "approved-halcyon-hero.webp", "approved-halcyon-instrument.webp"]
-REJECTED = ["reject-ember-hero-terminal.webp", "reject-ember-principles-cards.webp", "reject-meridian-method.webp", "nice-not-wow-meridian-logpanel.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp"]
+REJECTED = ["reject-ember-hero-terminal.webp", "reject-ember-principles-cards.webp", "reject-meridian-method.webp", "nice-not-wow-meridian-logpanel.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp", "reject-provenant-gold-plate.webp", "reject-provenant-v2-beige-boxes.webp"]
 IMG = (".png", ".webp", ".jpg", ".jpeg")
 
 SECTION_TASK = """You are a demanding design director reviewing ONE section of a marketing web page against the rubric
@@ -70,7 +70,8 @@ PAGE_TASK = """You are Angel, a demanding client, judging a WHOLE landing page f
 APPROVED pages by Angel (pebble: tactile fintech; halcyon: cinematic instrument): {approved}
 REJECTED by Angel, in his words: ember "not good, generic AI templaty"; meridian "nice, but it's missing a wow factor"
 and its method section "a template with stick-figure placeholders"; ember v3 "oversaturated and feels like a game / toy,
-doesn't give a premium feeling or a wow factor": {rejected}
+doesn't give a premium feeling or a wow factor"; provenant (luxury store) "looks terrible - you don't create a luxurious
+feeling by writing 'luxury' or putting the price at the front, or covering everything with gold", "show real products, not concept"; provenant v2 (warm paper, small packshots in big beige boxes) "it still doesn't look good": {rejected}
 Page under review, section by section (read every file):
 {shots}
 DOM scan of structural tells (heuristic, from scripts/tells.js): {tells}
@@ -236,6 +237,7 @@ def line(name, j):
 def calibrate():
     cases = {  # anchor -> expected section pass
         "reject-meridian-method.webp": False, "reject-thin-line-art.webp": False,
+        "reject-provenant-gold-plate.webp": False, "reject-provenant-v2-beige-boxes.webp": False,
         "reject-anhermon-03364e9-serif-mono.webp": False,
         "accept-anhermon-v4-guard-codedrawn.webp": True,
         "reject-ember-v3-toy-fullbleed.webp": False,  # toy palette: measured saturation alone fails it

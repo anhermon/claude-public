@@ -14,6 +14,7 @@ type-systems.md and never reuse a face another concept in the same portfolio own
 | tactile consumer | yes: clay/soft 3D product objects, one per section, consistent lighting | the phone UI with named sample data | rarely |
 | cinematic / creative | yes: full-bleed film stills, one per section, one light direction | specs tables, controls | yes: hero shader or audio-reactive |
 | editorial dark product (anhermon) | 4:5 plates with real data labels overlaid | proof figures (allowlists, diffs) | hero |
+| e-commerce / brand storefront | campaign scenes only (one world: material, room, light), labelled as illustration; the PRODUCTS are real supplier photos, trimmed onto one plate | the guide/finder (real dimensions), the proprietary device (dimension rules, catalogue index), quick view; no charts, badges, stamps | no |
 | blueprint / engineering | no | isometric drawings, dimension lines, parts lists, revision blocks | optional |
 
 Code-drawn diagrams beat photos for every technical claim (the steel-slab guard lesson, imagery.md).
@@ -82,3 +83,71 @@ page does at least three of these:
 - Cobalt-to-ink ground (not neon on black), white and pale-cyan linework, drafting grid, dimension lines, callouts,
   parts-list tables, isometric exploded diagrams, stamped revision blocks. Condensed/technical display (Big Shoulders,
   Archivo Narrow) + a mono for callouts.
+
+## E-commerce / brand storefront (Provenant v1 + v2 rejected 2026-10-11/12)
+
+Angel, v1: "looks terrible - you don't create a luxurious feeling by writing 'luxury' or putting the price at the front,
+or covering everything with gold" + "show real products, not concept". v2 (warm paper + Cormorant, small packshots in big
+beige boxes, every product link going out to the supplier): "it still doesn't look good". Measured references:
+`~/dev/luxe-store/research/refs-v3/TABLE.md` (Angel's list) and `refs-v2/` (The Row, Khaite, Toteme, Minotti, Aesop, Rug Co).
+
+Angel's reference set and what each one is borrowed for (his words in quotes):
+| reference | borrow |
+|---|---|
+| Bang & Olufsen | "aspirational lifestyle imagery with clear product discovery": the product shot as a sculptural object, then a room it lives in, then a direct way to the item |
+| Aesop | "a cohesive visual identity, generous spacing, and useful guidance": a product finder/advisor that answers a real buying question |
+| Gentle Monster | "a distinctive campaign concept that carries through into the storefront": one world, not a category list |
+| Apple (AirPods Pro) | "give each section one clear message, supported by a compelling visual": oversized imagery, one sentence per section |
+| Polestar | "a disciplined design system and clear next actions": separate discover / configure / purchase paths |
+| LOEWE | "alternate editorial storytelling with focused, shoppable collections" |
+| Teenage Engineering | "a consistent graphic language that makes even ordinary interface elements feel proprietary" |
+
+Rules (each is checked by the critic; tells.js counts the measurable ones):
+1. **Coherent assortment before any concept.** The store sells ONE category a buyer shops as one thing (lighting,
+   fine jewelry, tabletop), with one customer and one buying question. A campaign story cannot glue unrelated
+   categories together: v3 "one dining room" over rings + tables + rugs was rejected as "wtf is the common theme
+   between rugs, tables and rings? it just looks incoherent". When the assortment comes from sourcing (dropship
+   margins), pick the category first, then the suppliers inside it, then the concept. The concept (Gentle Monster
+   rule) is the world of that one category.
+2. **One message per section** (Apple): a section has one sentence of claim and one dominant visual; never a heading
+   plus a paragraph plus a grid plus a note.
+3. **Rhythm** (LOEWE): editorial (full-bleed scene, one line) alternates with a focused shoppable collection; never two
+   collections or two scenes in a row; at least 2 scale changes per page.
+4. **Consistent plates, product at a deliberate scale.** Normalise every supplier packshot (trim the white margin,
+   re-pad to one aspect, same fill rule for every item) onto ONE plate colour used site-wide. Measured (refs-v3/TABLE.md):
+   plate = flat light grey, no border/radius/card shadow, on a white ground (B&O #f6f6f6, Apple #f5f5f7, Polestar
+   #f0f0f0, TE #f5f5f5); product at 40-55% of the plate in list views, 65-75% (cropped off-frame allowed) in the one
+   hero moment. Multiply a white packshot onto that grey, never onto beige (v2 was muddy beige-on-beige, products
+   floating small in big tinted boxes, one box empty). Price = a 12-13px caption under the name, same weight (B&O,
+   TE), or one row in a spec ledger (Polestar).
+5. **Discover / configure / purchase paths** (Polestar): every product opens an on-site quick view or detail panel with
+   a large image, material, dimensions, lead time, the real configuration options the supplier offers (sizes, carat,
+   wood), and one next action. Product links must never send the buyer to the supplier's or a competitor's site; mark each product
+   element `data-product` so tells.js `product_links_out` can check it.
+6. **Guidance** (Aesop): one finder/advisor that answers a real question with real data (which rug size fits this
+   table; which ring setting for this stone), drawn in code with real dimensions; optional, never the only idea.
+7. **Proprietary graphic language** (Teenage Engineering): one consistent device carried through ordinary UI (e.g. a
+   dimension rule with real measurements on every product, a numbered catalogue index tied to real SKUs, a single
+   drawn line motif). One device, used everywhere, not decoration in one place.
+8. **Restraint** (still): sans-led or one refined face chosen from the measured table, not warm paper + Cormorant by
+   default; near-white or one deep ground; small quiet nav and captions; price small, after the name, in caption
+   weight; no "luxury/premium/exclusive/curated"; no gold or brass fills, gradients, metallic textures.
+9. **Scenes are labelled.** Generated rooms are atmosphere; a hotspot or "shop the room" on a generated scene must say
+   "illustration" and name the closest real piece, never imply the drawn object is the product.
+11. **Motion is scrubbed and quiet** (v3 r1: "the animations are quirky, and visually the site still looks mid"):
+    a scroll scene's zoom is driven continuously by scroll progress (no timed transition, never a transform-origin
+    change between steps, which jumps); image swaps crossfade with scroll; text fades only. No translateY slide-up
+    reveals on cards or copy, no staggered card entrances, no hover outlines. Storefront peers barely animate.
+12. **No UI cards floating over campaign photography.** Product name, price and "View" sit on the image as a caption
+    (B&O/LOEWE) or beside it; a white panel pasted on a photo reads as a widget.
+13. **Shop-the-look hotspots are the storefront's explanatory visual** (Provenant v4, critic r1→r2 moved the page from
+    closest=rejected to closest=approved): on every campaign photo, a dot on the actual piece + hairline leader + "Name ·
+    price" caption linking to the on-site PDP. Positions stored as image fractions and mapped through object-fit:cover.
+    Home rows list in-stock pieces first; never show "Unavailable" on the home page. Plates pre-cropped to ~80% fill.
+14. **Copy claims follow the metal, not the brand idea.** "Doesn't tarnish / wear it in the water / sleep in it" is only
+    safe for verified 14K+ solid gold; 10K and chlorine make it false. Check each product's karat before writing it.
+10. **Wow** = editorial scale and pacing on the real goods (a scroll scene that moves from the room to the real product
+    at full scale; a packshot held at 60%+ viewport width), not a gimmick widget.
+- Fails as: gold plate/badge/stamp hero, price-forward cards, dark + gold, explaining the store's process instead of
+  showing the goods, disclaimer above the fold, tiny packshots in big tinted boxes, beige-on-beige, products linking out,
+  off-story items that break the concept (a bright orange rug in a madder-and-indigo room).
