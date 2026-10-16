@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **premium-web 2.0.0 — now a Claude Code mod.** The skill builds several materially different candidates (default 3, `candidateCount` setting 1-6, or a number in the request) in parallel, runs one critic pass on each, and presents them in a new "Premium candidates" pane (`/candidates`, or the `premium_web_present_candidates` tool). The user browses, opens each candidate in the browser, picks one or sends feedback; the choice is written to `.premium-web/decision.json` and sent back to Claude, which then finishes only the winner through the full critic loop. A chat fallback covers Claude Code < 2.1.287, disabled mods and non-interactive runs.
+
+### Added
+
+- `plugins/premium-web/hooks/` (mod: `register.ts`, `lib.ts`), `tests/` (`claude plugin test`), `skills/premium-web/references/candidates.md`.
+
+### Security
+
+- Mods are unsandboxed. This one reads/writes only `.premium-web/` in the project, serves candidate folders on 127.0.0.1 via `python3 -m http.server`, and makes no other network calls. See the plugin README.
+
 ## [0.2.3] — 2026-04-07
 
 ### Fixed
