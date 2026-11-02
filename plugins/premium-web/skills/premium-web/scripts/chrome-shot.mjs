@@ -1,7 +1,8 @@
 // Zero-dependency Chrome capture + checks over raw CDP (Node 22+ global WebSocket). Throwaway profile, never your
 // logged-in Chrome. Trackers are blocked BEFORE the first navigation.
 // Usage: node chrome-shot.mjs <url> <outdir> [widths=1440,390]
-//   env: RM=1 (prefers-reduced-motion), SCHEME=light|dark, STEPS=n (max viewport shots per width, default 10),
+//   env: CHROME_FLAGS="--use-angle=metal" (extra Chrome args; WebGL captures can be blank without a real GPU path), CHROME_PATH,
+//        RM=1 (prefers-reduced-motion), SCHEME=light|dark, STEPS=n (max viewport shots per width, default 10),
 //        EVAL=<file.js> (evaluate a script, e.g. measure-site.js, and save its result; SUMMARY=1 asks measure-site.js for its short form), SHOTS=0 (checks only)
 //        SECTIONS=1 (or a selector; default "main > section, footer"): one dir per section in <outdir>/sections/<nn-id>/,
 //          files <width>[-pN].png (tall sections split per viewport, max 3). Fixed and sticky headers hidden (WOW scroll offset = measured header height), reveals settled (waits for finite animations to finish, cap 5s).
@@ -26,7 +27,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pw-chrome-"));
 const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", "--remote-allow-origins=*", `--user-data-dir=${dir}`,
-  "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--enable-webgl", "--ignore-gpu-blocklist", "about:blank"], { stdio: "ignore" });
+  "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--enable-webgl", "--ignore-gpu-blocklist", ...(process.env.CHROME_FLAGS ? process.env.CHROME_FLAGS.split(/\s+/) : []), "about:blank"], { stdio: "ignore" });
 let port;
 for (let i = 0; i < 100 && !port; i++) { await wait(100); try { port = fs.readFileSync(path.join(dir, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch {} }
 if (!port) { console.error("Chrome did not start"); chrome.kill(); process.exit(2); }
@@ -79,7 +80,7 @@ for (const w of ws.split(",").map(Number)) {
   if (process.env.SECTIONS) {
     const sel = process.env.SECTIONS === "1" ? "main > section, footer" : process.env.SECTIONS;
     const secs = await evaluate(`[...document.querySelectorAll(${JSON.stringify(sel)})].map((e, i) => String(i).padStart(2, '0') + '-' + (e.id || e.getAttribute('aria-labelledby') || e.tagName.toLowerCase()).replace(/[^a-z0-9-]/gi, ''))`);
-    await evaluate(`document.documentElement.style.scrollBehavior='auto';[...document.querySelectorAll('body *')].filter(e=>getComputedStyle(e).position==='fixed' || (getComputedStyle(e).position==='sticky' && e.matches('header, nav, [role=banner]') && e.getBoundingClientRect().top <= 1)).forEach(e=>e.style.visibility='hidden')`); // sticky headers too, else every section shot starts under the nav (ember v3: "eyebrow clipped under the nav" x6); scroll-scene stages (sticky, not headers) stay
+    await evaluate(`document.documentElement.style.scrollBehavior='auto';[...document.querySelectorAll('body *')].filter(e=>getComputedStyle(e).position==='fixed' || (getComputedStyle(e).position==='sticky' && e.matches('header, nav, [role=banner]') && e.getBoundingClientRect().top <= 1)).forEach(e=>e.style.visibility='hidden')`); // sticky headers too, else every section shot starts under the nav; scroll-scene stages (sticky, not headers) stay
     for (let i = 0; i < secs.length; i++) {
       const d = path.join(out, "sections", secs[i]); fs.mkdirSync(d, { recursive: true });
       const r = await evaluate(`(() => { const e = document.querySelectorAll(${JSON.stringify(sel)})[${i}], b = e.getBoundingClientRect(); return { top: b.top + scrollY, height: b.height, scene: e.matches('[data-scene]') }; })()`);
@@ -87,7 +88,7 @@ for (const w of ws.split(",").map(Number)) {
       const parts = Math.max(1, Math.min(r.scene ? 6 : 3, Math.ceil(r.height / h - 0.15)));
       for (let k = 0; k < parts; k++) {
         await evaluate(`scrollTo(0, ${Math.round(r.top + k * h)})`); await wait(r.scene ? 1600 : 900); // reveals (0.6s) / scene easing settle
-        // then until every finite CSS/WAAPI animation is done (cap 5s): staggered reveals (sieve chips at .8s + --d) were shot mid-fade (sealref r8 390)
+        // then until every finite CSS/WAAPI animation is done (cap 5s): staggered reveals (sieve chips at .8s + --d) were shot mid-fade
         await evaluate(`new Promise((ok) => { const t0 = performance.now(); (function poll() { const busy = document.getAnimations().some((a) => a.playState === "running" && a.effect && a.effect.getComputedTiming().endTime !== Infinity); if (!busy || performance.now() - t0 > 5000) ok(); else setTimeout(poll, 100); })(); })`);
         const y = await evaluate("scrollY"), clipH = Math.max(1, Math.min(h, r.top + r.height - y));
         const f = path.join(d, `${w}${parts > 1 ? "-p" + (k + 1) : ""}.png`);
@@ -101,13 +102,13 @@ for (const w of ws.split(",").map(Number)) {
     await send("Page.navigate", { url }); await wait(300);
     await evaluate(`new Promise(r => { const go = () => { const e = document.querySelector(${JSON.stringify(process.env.WOW)}); if (e) { document.documentElement.style.scrollBehavior='auto'; const hs = [...document.querySelectorAll('header, nav, [role=banner]')].filter((h) => { const c = getComputedStyle(h), b = h.getBoundingClientRect(); return (c.position === 'fixed' || c.position === 'sticky') && b.top <= 1 && b.width > innerWidth * 0.6 && b.height < 200; }); scrollTo(0, e.getBoundingClientRect().top + scrollY - Math.max(0, ...hs.map((h) => h.getBoundingClientRect().height)) - 8); } r(); }; document.readyState === 'complete' ? go() : addEventListener('load', go); })`);
     // a scroll-driven scene ([data-scene]) is captured at 4 scroll positions (one per beat), not 4 moments:
-    // time frames of a scroll scene are identical and the critic rightly scores them "nothing happens" (Plumb r5)
+    // time frames of a scroll scene are identical and the critic rightly scores them "nothing happens"
     const sc = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(process.env.WOW)}); if (!e || !e.matches('[data-scene]') || e.classList.contains('is-static')) return null; const b = e.getBoundingClientRect(); return { top: b.top + scrollY, span: Math.max(0, b.height - innerHeight), steps: e.querySelectorAll('.scene-step').length || 4 }; })()`);
     // WOW_ACT=<js> starts an interaction (click, replay, drag) and then frames are time-spaced from that moment.
-    // Frames are MID-ANIMATION on purpose: polish is judged in motion, not at rest (ember r2 Rail lesson).
+    // Frames are MID-ANIMATION on purpose: polish is judged in motion, not at rest.
     let N; const act = process.env.WOW_ACT, times = [250, 500, 800, 1200, 1800, 2700, 4500]; N = process.env.RM === "1" ? 2 : times.length;
     // scroll scene: beat 1 at rest, then every beat boundary caught twice mid-transition (250ms, 700ms), then the end
-    // at rest. Evenly spaced positions landed on settled beats and never showed the payoff transition (sealref r7).
+    // at rest. Evenly spaced positions landed on settled beats and never showed the payoff transition.
     const plan = sc && !act && process.env.RM !== "1" ? [[0, 1600]].concat([...Array(sc.steps - 1)].flatMap((_, i) => [[(i + 1) / sc.steps + 0.01, 250], [null, 450]]), [[1, 1600]]) : null;
     if (plan) N = plan.length; // reduced motion: a static poster, 2 frames prove it holds still
     if (act) await evaluate(`(async () => { ${act} })()`);
@@ -133,7 +134,7 @@ for (const w of ws.split(",").map(Number)) {
     try { rendered[sel] = (await send("CSS.getPlatformFontsForNode", { nodeId })).fonts.map((f) => f.familyName + (f.isCustomFont ? " (webfont)" : " (system)")).join(", "); } catch {}
   }
   let evalResult;
-  if (process.env.EVAL) { // scan a fully revealed page: scroll-reveals left at opacity 0 read as "no media" (Plumb r7 false tells after the WOW reload)
+  if (process.env.EVAL) { // scan a fully revealed page: scroll-reveals left at opacity 0 read as "no media" (false tells after the WOW reload)
     await evaluate(`(async () => { document.documentElement.style.scrollBehavior = 'auto'; for (let y = 0; y < document.documentElement.scrollHeight; y += innerHeight * 0.6) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); } await new Promise((r) => setTimeout(r, 900)); scrollTo(0, 0); })()`);
     evalResult = await evaluate((process.env.SUMMARY ? "window.__SUMMARY = true;\n" : "") + fs.readFileSync(process.env.EVAL, "utf8"));
   }

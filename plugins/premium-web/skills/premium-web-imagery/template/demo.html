@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>scrub-player demo</title><link rel="icon" href="data:,">
+<style>
+  :root { --ground: #0e0f12; --ink: #ece8dc; --accent: #7fa2ff; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 16px/1.4 system-ui, sans-serif; }
+  .intro, .outro { min-height: 60vh; display: grid; place-items: center; font-size: clamp(28px, 6vw, 72px); }
+  .scrub { height: 400vh; position: relative; }
+  .stage { position: sticky; top: 0; height: 100vh; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .readout { position: absolute; left: 16px; bottom: 16px; color: var(--accent); font: 12px ui-monospace, monospace; }
+</style></head>
+<body>
+<div class="intro">Scroll</div>
+<section class="scrub"><div class="stage"><canvas id="c" aria-label="Scroll-scrubbed sequence" role="img"></canvas><div class="readout" id="r"></div></div></section>
+<div class="outro">End</div>
+<script type="module">
+  import { init } from './scrub-player.js';
+  // ?base=<dir with manifest.json>/ &mode=sequence|video
+  const q = new URLSearchParams(location.search);
+  const c = document.getElementById('c');
+  init(c, { base: q.get('base') || '', mode: q.get('mode') || 'sequence' }).then(() => {
+    document.documentElement.dataset.ready = '1';
+    const r = document.getElementById('r');
+    (function loop() { r.textContent = 'frame ' + (c.dataset.frame ?? '-'); requestAnimationFrame(loop); })();
+  });
+</script>
+</body></html>

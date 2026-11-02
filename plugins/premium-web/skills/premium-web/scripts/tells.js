@@ -1,7 +1,7 @@
 // Templaty-tells scanner. Paste into a devtools / claude-in-chrome javascript_tool, or run headless:
 //   EVAL=scripts/tells.js SHOTS=0 node scripts/chrome-shot.mjs <url> <out> 1440   (result in report.json -> eval)
 // Returns JSON: each tell with a count, examples, and hit=true when over its threshold. Thresholds were set on
-// 2026-10-01 against Angel's verdicts: ember + meridian REJECTED, pebble + halcyon APPROVED (see rubric.md).
+// 2026-10 on a small labelled set (rejected builds hit 5-9 tells, approved builds 2-4); see references/section-craft.md.
 // Heuristics, not proof: a hit means "the critic must look at this", a clean scan does not mean premium.
 (() => {
   const vis = (e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none" && +s.opacity > 0; };
@@ -58,7 +58,7 @@
     return vis(m) && r.width >= 200 && r.height >= 120 && (/^(IMG|CANVAS|VIDEO|svg)$/.test(m.tagName) || /url\(/.test(getComputedStyle(m).backgroundImage)); });
   const below = media.filter((m) => !sections[0] || !sections[0].contains(m));
   out.material = { media_total: media.length, below_hero: below.length, hit: below.length === 0 };
-  // one-note = single accent hue AND (almost) no images/renders/canvas to carry colour and depth (halcyon: gold on black + film imagery passes)
+  // one-note = single accent hue AND (almost) no images/renders/canvas to carry colour and depth (gold on black with film imagery passes)
   out.palette.hit = out.palette.hit && below.length < 2;
 
   // 6. Empty spacing: per section, share of a 16x10 sample grid covered by a text line, media, or a coloured box.
@@ -81,18 +81,18 @@
   const ps = [...document.querySelectorAll("main p")].filter(vis), mono = ps.filter((p) => /mono|courier|menlo|consolas/i.test(getComputedStyle(p).fontFamily));
   out.mono_body = { share: ps.length ? +(mono.length / ps.length).toFixed(2) : 0, hit: ps.length > 3 && mono.length / ps.length > 0.6 };
 
-  // 10. Bordered mono panels as the default container (ember r2: "terminal card" in every section).
+  // 10. Bordered mono panels as the default container (a "terminal card" in every section).
   const isMono = (e) => /mono|courier|menlo|consolas/i.test(getComputedStyle(e).fontFamily);
   const panel = (e) => { const cs = getComputedStyle(e), r = e.getBoundingClientRect(); if (okMark(e) || !vis(e) || r.width < 160 || r.height < 60) return false;
     const boxed = parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderLeftWidth) > 0 || (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== getComputedStyle(e.parentElement).backgroundColor);
     if (!boxed) return false; const t = [...e.querySelectorAll("*")].filter((c) => [...c.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
     const own = (c) => [...c.childNodes].reduce((a, n) => a + (n.nodeType === 3 ? n.textContent.trim().length : 0), 0); // own text only, no double counting
     const all = t.reduce((a, c) => a + own(c), 0) || 1, m = t.filter(isMono).reduce((a, c) => a + own(c), 0);
-    return (t.length ? m / all : isMono(e) ? 1 : 0) > 0.3; }; // a command panel with prose around it still counts (ember r2 revisions panel: 34% mono at 1440)
+    return (t.length ? m / all : isMono(e) ? 1 : 0) > 0.3; }; // a command panel with prose around it still counts (34% mono at 1440 was enough)
   const panelSecs = sections.filter((sec) => [...sec.querySelectorAll("div, pre, figure, article, aside, section, ol, ul")].some(panel));
   out.mono_panels = { sections_with_panel: panelSecs.length, hit: sections.length >= 3 && panelSecs.length / sections.length >= 0.6 };
 
-  // 11. Timeline list beside a mono command panel (ember r2 revisions: "looks bad").
+  // 11. Timeline list beside a mono command panel.
   const split = sections.filter((sec) => { const lists = [...sec.querySelectorAll("ol, ul")].filter((l) => vis(l) && l.children.length >= 3 && !l.closest("nav"));
     const panels = [...sec.querySelectorAll("pre, div, figure")].filter(panel);
     return lists.some((l) => { const a = l.getBoundingClientRect(); return panels.some((p) => { if (p.contains(l) || l.contains(p)) return false; const b = p.getBoundingClientRect();
@@ -104,13 +104,13 @@
     const drawn = /^(IMG|CANVAS|VIDEO|svg)$/i.test(e.tagName) || cs.backgroundImage.includes("url(") || (e !== sec && cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== getComputedStyle(sec).backgroundColor);
     const bigType = parseFloat(cs.fontSize) >= Math.min(160, vw * 0.16) && [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     return (drawn && r.width >= vw * 0.95 && r.height >= Math.min(innerHeight * 0.4, 360)) || (bigType && r.width >= vw * 0.6); }) || (sec !== sections[0] && getComputedStyle(sec).backgroundColor !== getComputedStyle(document.body).backgroundColor && sec.getBoundingClientRect().width >= vw * 0.95 && ([...sec.querySelectorAll("img, canvas, svg, video")].some((m) => vis(m) && m.getBoundingClientRect().width >= vw * 0.6)
-      // or display type on a contrasting full-width ground (sealref transcript: 316px numerals on paper went undetected)
+      // or display type on a contrasting full-width ground (316px numerals on paper went undetected)
       || [...sec.querySelectorAll("*")].some((t) => vis(t) && parseFloat(getComputedStyle(t).fontSize) >= Math.min(160, vw * 0.16) && [...t.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())))));
   out.no_fullbleed = { hit: sections.length >= 3 && !fb };
 
-  // 13. Saturated fields (Angel on ember v3: "oversaturated, feels like a game / toy"): share of each section's sample grid
-  // covered by a HOT background (HSV S > .72, V > .5: primaries, neon, brand pink). Calibrated 2026-10-02 with
-  // scripts/saturation.py: approved pebble/halcyon/tracer 0.00-0.01 of screenshot area, rejected ember v3 0.19, ember v2 0.14.
+  // 13. Saturated fields (toy palette): share of each section's sample grid
+  // covered by a HOT background (HSV S > .72, V > .5: primaries, neon, brand pink). Same thresholds and provenance as
+  // scripts/saturation.py (approved pages 0.00-0.01 of screenshot area, rejected toy palettes 0.14-0.19).
   const hot = (c) => { const v = rgb(c); if (v.length < 3 || v[3] === 0) return false; const mx = Math.max(v[0], v[1], v[2]), mn = Math.min(v[0], v[1], v[2]); return mx / 255 > 0.5 && mx > 0 && (mx - mn) / mx > 0.72; };
   const hotShare = sections.map((sec) => { const sr = sec.getBoundingClientRect();
     const rects = [sec, ...sec.querySelectorAll("*")].filter((e) => vis(e) && hot(getComputedStyle(e).backgroundColor)).map((e) => e.getBoundingClientRect());
@@ -119,9 +119,9 @@
   const toy = hotShare.filter((c) => c.hot > 0.25);
   out.saturated_fields = { per_section: hotShare, toy: toy.map((c) => c.section), hit: toy.length >= 2 || (sections.length > 0 && hotShare.reduce((a, c) => a + c.hot, 0) / sections.length > 0.15) };
 
-  // 14. Section-craft gates (2026-10-04, fixmap redesign: "looks better but basic, no wow"). HARD gates (craft_fail), not just tells.
+  // 14. Section-craft gates (a build passed type, palette and Lighthouse and was still "basic, no wow"). HARD gates (craft_fail), not just tells.
   // panel_run: >3 CONSECUTIVE sections whose main content is a bordered/filled box (any font), i.e. the dev-tool panel template.
-  const boxed = (e) => { const cs = getComputedStyle(e), r = e.getBoundingClientRect(); if (okMark(e) || !vis(e) || r.width < 240 || r.height < 80 || /^(BUTTON|A|INPUT|LABEL|TD|TH|TR|LI)$/.test(e.tagName) || e.querySelector("img, picture, canvas, video")) return false; // rendered material inside = not a bare panel (pebble clay cards)
+  const boxed = (e) => { const cs = getComputedStyle(e), r = e.getBoundingClientRect(); if (okMark(e) || !vis(e) || r.width < 240 || r.height < 80 || /^(BUTTON|A|INPUT|LABEL|TD|TH|TR|LI)$/.test(e.tagName) || e.querySelector("img, picture, canvas, video")) return false; // rendered material inside = not a bare panel
     return (parseFloat(cs.borderTopWidth) > 0 && parseFloat(cs.borderLeftWidth) > 0) || (cs.backgroundColor !== "rgba(0, 0, 0, 0)" && cs.backgroundColor !== getComputedStyle(e.parentElement).backgroundColor); };
   const secBoxed = sections.map((sec) => { const sr = sec.getBoundingClientRect(); let a = 0; [...sec.querySelectorAll("div, pre, figure, article, aside, table, ul, ol")].filter(boxed).forEach((e) => { const r = e.getBoundingClientRect(); if (!e.parentElement.closest("[class]") || !boxed(e.parentElement)) a += r.width * r.height; }); return a / (sr.width * sr.height || 1) > 0.08; });
   let run = 0, maxRun = 0; secBoxed.forEach((b) => { run = b ? run + 1 : 0; maxRun = Math.max(maxRun, run); });
@@ -140,14 +140,14 @@
   // wow_visible: a canvas/svg/video/img >= 50% of viewport width and >= 40% of viewport height must start inside the first viewport (the wow is above the fold).
   const first = [...document.querySelectorAll("canvas, svg, img, video, picture, [data-wow], section, header, div")].some((e) => { if (!vis(e)) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); const media = /^(CANVAS|SVG|IMG|VIDEO|PICTURE)$/i.test(e.tagName) || e.hasAttribute("data-wow") || cs.backgroundImage.includes("url("); return media && r.width >= vw * 0.25 && r.height >= innerHeight * 0.3 && r.top < innerHeight * 0.75 && r.top + scrollY >= 0 && r.top + scrollY < innerHeight; });
   out.wow_visible = { hit: vw >= 1000 && !first }; // desktop only; 390 is judged from the critic frames
-  // storefronts (styles.md e-commerce rule 5): product cards carry [data-product]; a link from one to another origin sends the buyer away
+  // storefronts (references/direction.md): product cards carry [data-product]; a link from one to another origin sends the buyer away
   const outLinks = [...document.querySelectorAll("[data-product] a[href]")].filter((a) => a.origin && a.origin !== location.origin);
   out.product_links_out = { count: outLinks.length, examples: outLinks.slice(0, 3).map((a) => a.href), hit: outLinks.length > 0 };
   const craftKeys = ["panel_run", "scale_change", "type_scale", "wow_visible"];
   const craft_fail = craftKeys.filter((k) => out[k].hit);
 
   const hits = Object.entries(out).filter(([k, v]) => v.hit && !craftKeys.includes(k)).map(([k]) => k);
-  // Calibration: see references/rubric.md "Templaty tells" (pinned rejected pages >= 4, approved pages <= 3).
+  // Calibration: see references/section-craft.md "Templaty tells" (rejected pages >= 4, approved pages <= 3).
   // So: >= 4 hits = templaty (fail), 3 = look hard, <= 2 = no structural tells (still needs the visual critic).
   return { sections: sections.length, hits, templaty: hits.length >= 4, craft_fail, tells: out };
 })();

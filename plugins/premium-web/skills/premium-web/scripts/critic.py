@@ -1,97 +1,141 @@
 #!/usr/bin/env python3
-"""Section critic: scores every section screenshot against references/rubric.md with a vision model.
+"""Independent section / wow / page critic. Judges screenshots from the written rubric and, optionally, run-time anchors.
 
 Usage:
-  critic.py <sections-dir>            # one subdir per section (from SECTIONS=1 chrome-shot.mjs); writes critic.json
-  critic.py <sections-dir> --wow <id> [--wow-test "<acceptance test>"]  # REQUIRED: score the page's signature moment against its declared test; wow < 4 fails the page
-  critic.py --calibrate               # judge the gallery anchors; exit 1 if the critic misjudges any
+  critic.py <sections-dir> --wow <id> [--wow-test "<acceptance test>"] [--pass-refs DIR] [--fail-refs DIR]
+      <sections-dir> has one subdir of screenshots per section (from `SECTIONS=1 chrome-shot.mjs`); writes critic.json.
+      --wow <id>        REQUIRED: the section dir holding the signature-moment frames (or --wow-exempt REASON for sub-pages)
+      --pass-refs DIR   optional folder (outside the repo) with 1-2 images per section type that the owner judged good
+      --fail-refs DIR   optional folder with images judged bad or "nice but not wow"
+  critic.py --calibrate DIR   DIR holds pass/ and fail/ section images; reports where the critic disagrees
+  critic.py --calibrate       prints how to build such a corpus (exit 2)
 
-Each section is shown to a FRESH critic with one PASS anchor and one FAIL anchor from references/gallery, because
-an uncalibrated critic called the Meridian method section "visually rich" (2026-10-01). Pass/fail is computed here
-from the scores, never taken from the model. Exit code 1 = at least one section fails; 3 = critic unavailable (quota/session limit), verdict unknown.
-env: CRITIC=claude|codex (default claude: `claude -p --allowedTools Read`), CRITIC_MODEL (default sonnet),
-     CRITIC_JOBS=4 parallel critics.
+Rubric = references/section-craft.md + references/wow.md + references/failure-modes.md (read at run time; no
+screenshots ship with the skill). A FRESH critic judges each section; pass/fail is computed here from the scores and
+never taken from the model. Exit: 0 all pass, 1 something fails, 2 usage, 3 critic unavailable (quota: verdict unknown).
+Known calibration issue: a rubric-only critic scores strictly (a pilot corpus had no section above 4). Set the bar
+from external references: see references/qa-loop.md "Calibration" and the CRITIC_* env below.
+env: CRITIC=claude|codex (default claude: `claude -p --allowedTools Read`), CRITIC_MODEL (default sonnet), CRITIC_JOBS
+     (parallel critics, default 4), CRITIC_FOCAL_MIN (default 4), CRITIC_MAX_THREES (default 2), CRITIC_MAX_ROUNDS (3).
 """
-import json, os, re, subprocess, sys
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import saturation  # noqa: E402  (pixel share of hot colours per screenshot)
-GALLERY = SKILL / "references" / "gallery"
-RUBRIC = (SKILL / "references" / "rubric.md").read_text()
-CRIT = ["distinctiveness", "explanatory_visual", "density_detail", "hierarchy", "polish"]
-PASS_REFS = ["accept-anhermon-v4-guard-codedrawn.webp", "approved-pebble-jar-maths.webp", "approved-halcyon-instrument.webp"]
-FAIL_REFS = ["reject-meridian-method.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-principles-cards.webp", "reject-thin-line-art.webp"]  # judge_section shows the first two
-APPROVED = ["approved-pebble-hero.webp", "approved-pebble-jar-maths.webp", "approved-halcyon-hero.webp", "approved-halcyon-instrument.webp"]
-REJECTED = ["reject-ember-hero-terminal.webp", "reject-ember-principles-cards.webp", "reject-meridian-method.webp", "nice-not-wow-meridian-logpanel.webp", "reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp", "reject-provenant-gold-plate.webp", "reject-provenant-v2-beige-boxes.webp"]
-IMG = (".png", ".webp", ".jpg", ".jpeg")
+
+RUBRIC_FILES = ("section-craft.md", "wow.md", "failure-modes.md")
+CRIT = ["distinctiveness", "focal_visual", "finish", "hierarchy", "polish"]
+IMG = saturation.IMAGE_SUFFIXES
+EXIT_OK, EXIT_FAIL, EXIT_USAGE, EXIT_UNAVAILABLE = 0, 1, 2, 3
+SCORE_MIN, SCORE_MAX = 1, 5
+SCORE_FLOOR = 3                                   # no criterion may score below this
+FOCAL_MIN = int(os.environ.get("CRITIC_FOCAL_MIN", 4))
+MAX_THREES = int(os.environ.get("CRITIC_MAX_THREES", 2))
+MAX_ROUNDS = int(os.environ.get("CRITIC_MAX_ROUNDS", 3))  # consecutive failing runs of one section before "replace it"
+WOW_MIN, FALLBACK_MIN, MOTION_MIN = 4, 3, 4
+MIN_MID_FRAMES = 6                                # motion polish counts only with a real frame sequence
+REFS_PER_SECTION = 2
+PAGE_SHOT_LIMIT = 10                              # wide shots shown to the page critic
+WIDE_PREFIX = "1440"
+CRITIC_TIMEOUT_S = 600
+ASK_ATTEMPTS = 2
+HISTORY_FILE = "critic-history.json"
+CORPUS_HOWTO = """No calibration corpus given. Build one outside the repo:
+  <DIR>/pass/*.png   6-12 section screenshots at 1440 px that the owner judged good (premium)
+  <DIR>/fail/*.png   6-12 judged bad, plus a few 'nice but not wow' ones
+Then run: critic.py --calibrate <DIR>. Mismatches show where the bar (CRITIC_FOCAL_MIN, ban list) needs adjusting."""
+
+
+def load_rubric():
+    parts = []
+    for f in RUBRIC_FILES:
+        p = SKILL / "references" / f
+        parts.append(p.read_text() if p.exists() else f"(missing rubric file {f})")
+    return "\n\n".join(parts)
+
+
+RUBRIC = load_rubric()
+WOW_TEST = ""
 
 SECTION_TASK = """You are a demanding design director reviewing ONE section of a marketing web page against the rubric
 below. Default to skepticism: a clean layout with hairlines, small sketches and grey text is a FAIL, not "minimal".
-Calibration (read these first; they are judged already):
-- PASS anchors: {pass_ref}
-- FAIL anchors (stick-figure / template / "generic AI templaty"): {fail_ref}
-Section under review "{name}" (same section at different widths / moments; read every file):
+{refs}Section under review "{name}" (the same section at different widths / moments; read every file):
 {shots}
-Restraint check (Angel rejected ember v3 as "oversaturated, feels like a game / toy"; anchors reject-ember-v3-toy-*):
-big fields must be neutral or low-chroma, at most one or two saturated colours at small area. Full-strength primaries
-across large areas, rainbow overprint, sticker/pill colour everywhere = ban rule "Toy palette". Measured share of
-pixels at hot saturation in this section's 1440 shots: {sat}.
-Judge only what is visible. Every score needs evidence you can point to in the screenshots.
+Restraint check: big fields must be neutral or low-chroma, with at most one or two saturated colours at small area.
+Full-strength primaries across large areas, rainbow overprint, sticker or pill colour everywhere is the ban "Toy
+palette". Measured share of pixels at hot saturation in this section's 1440 shots: {sat}.
+Judge only what is visible. Every score needs evidence you can point to in the screenshots. `focal_visual` asks:
+does ONE designed focal moment (the persistent subject's state, a type moment, a media band, real UI in code, a
+micro-demo, or a diagram when the section explains a mechanism) carry this section's message? `finish` asks: light,
+material, grain and precise detail, or flat fills and default shadows?
 Reply with ONLY this JSON, no prose:
 {{"section":"{name}","what_it_shows":"<one sentence>","explanatory_visual_present":true|false,
-"scores":{{"distinctiveness":{{"score":1-5,"evidence":"..."}},"explanatory_visual":{{"score":1-5,"evidence":"..."}},
-"density_detail":{{"score":1-5,"evidence":"..."}},"hierarchy":{{"score":1-5,"evidence":"..."}},"polish":{{"score":1-5,"evidence":"..."}}}},
+"scores":{{"distinctiveness":{{"score":1-5,"evidence":"..."}},"focal_visual":{{"score":1-5,"evidence":"..."}},
+"finish":{{"score":1-5,"evidence":"..."}},"hierarchy":{{"score":1-5,"evidence":"..."}},"polish":{{"score":1-5,"evidence":"..."}}}},
 "ban_hits":[{{"rule":"<ban list item>","evidence":"..."}}],
-"fixes":["<concrete change: what visual to build, with what real data/labels>"]}}
+"fixes":["<concrete change: what to build, with what real data or material>"]}}
+(`explanatory_visual_present` means: a designed focal moment is present.)
 """
-WOW_TEST = ""
-WOW_TASK = """You are judging the SIGNATURE moment of a web page (rubric's "Wow" section below).
-Calibration: {wow_pass} scores 4-5 (subject-derived, replayable WebGL); {wow_nice} scores 3 (competent but every
-product in the category has one). Frames of the moment under review (t1..tN are MID-ANIMATION frames, time-spaced
-or one per scroll position, then rm-* reduced-motion / poster fallback frames if present; read every file):
+
+WOW_TASK = """You are judging the SIGNATURE moment of a web page (see the rubric's wow section below).
+{refs}Frames of the moment under review (t1..tN are MID-ANIMATION frames, time-spaced or one per scroll position,
+then rm-* reduced-motion / poster fallback frames if present; read every file):
 {shots}
-The page declared this ACCEPTANCE TEST for its wow (judge against it literally; if it is empty, the page failed intake): "{wow_test}"
-A wow below 4 fails the whole page regardless of every other score. Anchors: a 4 = a stranger would screenshot it unprompted and the
-product's own substance is what you are looking at (Stripe's live checkout beside a gradient wedge, Linear's real product UI at full width,
-a rendered object); 3 = a competent panel/chart/diagram of the kind every product in the category has; a table, a list, bordered boxes = 1-2.
+The page declared this ACCEPTANCE TEST for its wow (judge against it literally; if empty, intake failed): "{wow_test}"
+A wow below {wow_min} fails the whole page regardless of every other score. A 4 = a stranger would screenshot it
+unprompted and the subject's own substance is what you are looking at; 3 = a competent panel, chart or diagram of the
+kind every product in the category has; a table, list or bordered boxes = 1-2.
 Question 1: would someone screenshot this and send it to a colleague? Be honest; "nice" is a 3.
-Question 2, motion polish, judged on the MIDDLE frames, not only the last (Angel on ember r2's signature: "nice,
-the animation needs a bit more polish"): easing and settle (nothing half-faded into a smear, no stop-start), particle
-budget (points are information, no ambient dust), no particles or trails over text, glow never muddies labels,
-half-drawn states look intentional, one focal motion at a time. Cite the frame file for each problem.
+Question 2, motion polish, judged on the MIDDLE frames, not only the last: easing and settle (nothing half-faded into
+a smear, no stop-start), points are information (no ambient dust), no particles or trails over text, glow never
+muddies labels, half-drawn states look intentional, one focal motion at a time, no ghosted double headlines. Cite the
+frame file for each problem.
 Reply with ONLY this JSON: {{"wow":{{"score":1-5,"evidence":"...","would_share_because":"... or why not"}},
 "motion_polish":{{"score":1-5,"evidence":"<frame file: problem>"}},
 "fallback":{{"score":1-5,"evidence":"..."}},"fixes":["..."]}}
 """
-PAGE_TASK = """You are Angel, a demanding client, judging a WHOLE landing page from its section screenshots.
-APPROVED pages by Angel (pebble: tactile fintech; halcyon: cinematic instrument): {approved}
-REJECTED by Angel, in his words: ember "not good, generic AI templaty"; meridian "nice, but it's missing a wow factor"
-and its method section "a template with stick-figure placeholders"; ember v3 "oversaturated and feels like a game / toy,
-doesn't give a premium feeling or a wow factor"; provenant (luxury store) "looks terrible - you don't create a luxurious
-feeling by writing 'luxury' or putting the price at the front, or covering everything with gold", "show real products, not concept"; provenant v2 (warm paper, small packshots in big beige boxes) "it still doesn't look good": {rejected}
-Page under review, section by section (read every file):
+
+PAGE_TASK = """You are a demanding client judging a WHOLE landing page from its section screenshots.
+{refs}Page under review, section by section (read every file):
 {shots}
 DOM scan of structural tells (heuristic, from scripts/tells.js): {tells}
-1. Distinctiveness test: cover the brand name. Could this page belong to 20 other products in its category? Name
-   two real or typical competitors whose page it could be, or say why it could not.
+1. Distinctiveness test: cover the brand name. Could this page belong to 20 other products in its category? Name two
+   real or typical competitors whose page it could be, or say why it could not.
 2. Templaty tells (rubric list): which are visible? Evidence for each.
-3. Do sections change shape and meaning, or could they swap places without changing anything?
-4. Restraint: does the page hold to one or two saturated colours at small area with large neutral fields, or does it
-   read as a toy / game (primaries at full saturation over big areas, rainbow)? Measured hot-pixel share across the
-   wide shots: {sat}. A toy-reading page is closest_to "rejected" whatever else it does well.
-Reply with ONLY this JSON: {{"could_be_20_others":true|false,"lookalikes":["..."],"distinctive_because":"...",
-"tells_seen":[{{"tell":"...","evidence":"..."}}],"sections_interchangeable":true|false,
-"closest_to":"approved"|"rejected","verdict_in_angels_words":"<one sentence>","fixes":["..."]}}
+3. Do sections change shape and meaning, or could they swap places without changing anything? Does one persistent
+   subject carry through the chapters?
+4. Restraint: one or two saturated colours at small area with large neutral fields, or a toy/game look? Measured
+   hot-pixel share across the wide shots: {sat}.
+{closest}Reply with ONLY this JSON: {{"could_be_20_others":true|false,"lookalikes":["..."],"distinctive_because":"...",
+"tells_seen":[{{"tell":"...","evidence":"..."}}],"sections_interchangeable":true|false,{closest_key}
+"verdict":"<one sentence>","fixes":["..."]}}
 """
+CLOSEST_Q = "5. Is the page closer to the PASS references or the FAIL references? Answer closest_to.\n"
+CLOSEST_KEY = '"closest_to":"pass_refs"|"fail_refs",'
 
 
-def page_pass(j):
-    # tells_seen count dropped: the approved pages drew 5+ critic-listed tells in the 2026-10-01 reachability run (a
-    # count double-counts what closest_to already weighs). The DOM scan (tells.js) still forces a fail when templaty.
-    return "error" not in j and not j.get("could_be_20_others") and j.get("closest_to") == "approved"
+def ref_files(folder):
+    if not folder:
+        return []
+    return sorted(str(p) for p in Path(folder).iterdir() if p.suffix.lower() in IMG)[:REFS_PER_SECTION] if Path(folder).is_dir() else []
+
+
+def refs_text(pass_refs, fail_refs):
+    out = []
+    if pass_refs:
+        out.append("PASS anchors (judged good by the owner; use them to calibrate what a 4-5 looks like): " + ", ".join(pass_refs))
+    if fail_refs:
+        out.append("FAIL anchors (judged bad or 'nice but not wow'; what a 1-3 looks like): " + ", ".join(fail_refs))
+    return ("Calibration (read these first; they are already judged):\n- " + "\n- ".join(out) + "\n") if out else \
+           "No external anchors were supplied: judge from the rubric alone, and remember rubric-only critics tend to be strict.\n"
 
 
 def hot_share(paths):
@@ -99,19 +143,13 @@ def hot_share(paths):
     return sum(v) / len(v) if v else 0.0
 
 
-def judge_page(shots, tells="(not run)", exclude=()):
-    j = ask(PAGE_TASK.format(approved=", ".join(str(GALLERY / a) for a in APPROVED if a not in exclude),
-                             rejected=", ".join(str(GALLERY / a) for a in REJECTED if a not in exclude),
-                             shots="\n".join(f"- {s}" for s in shots), tells=tells, sat=f"{hot_share(shots):.2f} (toy above 0.12)") + "\n\nRUBRIC:\n" + RUBRIC, ("could_be_20_others", "closest_to"))
-    j["saturation"] = round(hot_share(shots), 3)
-    j["pass"] = page_pass(j) and j["saturation"] <= 0.12  # measured, not model-judged: ember v3 0.19, approved pages 0.00-0.01
-    if j["saturation"] > 0.12:
-        j.setdefault("fixes", []).append(f"saturation: {j['saturation']} of pixels at hot colour; neutral large fields, one small spot colour")
-    return j
+def page_pass(j, have_refs=False):
+    ok = "error" not in j and not j.get("could_be_20_others")
+    return ok and (not have_refs or j.get("closest_to") == "pass_refs")
 
 
 _S = {"type": "object", "required": ["score", "evidence"],
-      "properties": {"score": {"type": "integer", "minimum": 1, "maximum": 5}, "evidence": {"type": "string"}}}
+      "properties": {"score": {"type": "integer", "minimum": SCORE_MIN, "maximum": SCORE_MAX}, "evidence": {"type": "string"}}}
 _FIX = {"type": "array", "items": {"type": "string"}}
 SCHEMAS = {  # structured output per judge, keyed by its first required key (typed: untyped props came back as strings)
     "scores": {"type": "object", "required": ["section", "explanatory_visual_present", "scores", "ban_hits", "fixes"], "properties": {
@@ -123,17 +161,18 @@ SCHEMAS = {  # structured output per judge, keyed by its first required key (typ
     "wow": {"type": "object", "required": ["wow", "motion_polish", "fallback", "fixes"], "properties": {
         "wow": {**_S, "properties": {**_S["properties"], "would_share_because": {"type": "string"}}},
         "motion_polish": _S, "fallback": _S, "fixes": _FIX}},
-    "could_be_20_others": {"type": "object", "required": ["could_be_20_others", "closest_to", "verdict_in_angels_words"], "properties": {
+    "could_be_20_others": {"type": "object", "required": ["could_be_20_others", "verdict"], "properties": {
         "could_be_20_others": {"type": "boolean"}, "lookalikes": {"type": "array", "items": {"type": "string"}},
         "distinctive_because": {"type": "string"}, "sections_interchangeable": {"type": "boolean"},
         "tells_seen": {"type": "array", "items": {"type": "object", "properties": {"tell": {"type": "string"}, "evidence": {"type": "string"}}}},
-        "closest_to": {"type": "string", "enum": ["approved", "rejected"]}, "verdict_in_angels_words": {"type": "string"}, "fixes": _FIX}},
+        "closest_to": {"type": "string", "enum": ["pass_refs", "fail_refs"]}, "verdict": {"type": "string"}, "fixes": _FIX}},
 }
 
 
 def parse_reply(text, need=()):
-    """Needs every key in `need` (a truncated reply that lost ban_hits or fallback is a parse failure, not a pass). Largest JSON object in a model reply. Tolerates prose braces before it, raw newlines in strings and \\' escapes
-    (sealref r8: verdicts lost to a greedy regex, strict json.loads and a dropped final brace)."""
+    """Largest JSON object in a model reply that has every key in `need` (a truncated reply that lost ban_hits or
+    fallback is a parse failure, not a pass). Tolerates prose braces before it, raw newlines in strings, \\' escapes
+    and 1-3 dropped closing braces."""
     text, dec, best = re.sub(r"(?<!\\)((?:\\\\)*)\\'", r"\1'", text), json.JSONDecoder(strict=False), None
     for i, ch in enumerate(text):
         if ch == "{":
@@ -146,7 +185,7 @@ def parse_reply(text, need=()):
                     obj.update({k: v.pop(k) for k in need if k in v and k not in obj})
             if isinstance(obj, dict) and (not need or all(k in obj for k in need)) and (best is None or end - i > best[0]):
                 best = (end - i, obj)
-    if best is None and not text.endswith("\0"):  # replies drop 1-2 closing braces (sealref r8 wow, twice): retry closed
+    if best is None and not text.endswith("\0"):  # replies drop 1-2 closing braces: retry closed
         for k in (1, 2, 3):
             j = parse_reply(text.rstrip() + "}" * k + "\0", need)
             if j is not None:
@@ -156,7 +195,7 @@ def parse_reply(text, need=()):
 
 def ask(prompt, need=()):
     """Run one fresh critic; return parsed JSON (one retry on a parse failure). claude uses structured output
-    (--json-schema): free-text JSON lost 4 of ~40 verdicts on sealref r8 (bad escapes, raw quotes, dropped braces)."""
+    (--json-schema): free-text JSON lost verdicts to bad escapes, raw quotes and dropped braces."""
     codex = os.environ.get("CRITIC", "claude") == "codex"
     if codex:
         imgs = re.findall(r"(/\S+\.(?:png|webp|jpe?g))", prompt)
@@ -165,9 +204,10 @@ def ask(prompt, need=()):
         schema = SCHEMAS.get(need[0] if need else None, {"type": "object"})
         cmd = ["claude", "-p", "--allowedTools", "Read", "--model", os.environ.get("CRITIC_MODEL", "sonnet"),
                "--output-format", "json", "--json-schema", json.dumps(schema)]
-    for _ in range(2):
-        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=600)
-        out = r.stdout
+    out = err = ""
+    for _ in range(ASK_ATTEMPTS):
+        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=CRITIC_TIMEOUT_S)
+        out, err = r.stdout, r.stderr
         if not codex:
             try:
                 ev = json.loads(out)
@@ -180,52 +220,63 @@ def ask(prompt, need=()):
         j = parse_reply(out, need)
         if j is not None:
             return j
-    return {"error": (out + r.stderr)[-400:], "raw": out}  # full reply kept in critic.json for diagnosis
+    return {"error": (out + err)[-400:], "raw": out}  # full reply kept in critic.json for diagnosis
 
 
 def verdict(j):
+    """Section pass rule: focal_visual >= FOCAL_MIN, no score below SCORE_FLOOR, at most MAX_THREES scores at 3, no ban hits."""
     if "error" in j:
         return False, ["critic error"]
     sc = {c: int(j["scores"][c]["score"]) for c in CRIT}
-    # Calibrated 2026-10-01 against Angel-approved pages (reachability check): "all five >= 4" failed pebble's approved
-    # hero (polish 3) and 5/6 pebble sections, so the bar was unreachable. Rule now: the explaining visual scores >= 4,
-    # nothing below 3, and at most two 3s. Meridian method / ember principles still fail (explanatory 1-2, ban hits).
-    why = [f"{c}={v}" for c, v in sc.items() if v < 3]
-    if sc["explanatory_visual"] < 4:
-        why.append(f"explanatory_visual={sc['explanatory_visual']} (needs 4)")
-    if sum(v == 3 for v in sc.values()) > 2:
-        why.append("three or more scores at 3: " + ", ".join(f"{c}={v}" for c, v in sc.items() if v == 3))
+    why = [f"{c}={v}" for c, v in sc.items() if v < SCORE_FLOOR]
+    if sc["focal_visual"] < FOCAL_MIN:
+        why.append(f"focal_visual={sc['focal_visual']} (needs {FOCAL_MIN})")
+    if sum(v == SCORE_FLOOR for v in sc.values()) > MAX_THREES:
+        why.append("too many scores at 3: " + ", ".join(f"{c}={v}" for c, v in sc.items() if v == SCORE_FLOOR))
     if not j.get("explanatory_visual_present"):
-        why.append("no explanatory visual")
+        why.append("no designed focal moment")
     why += ["ban: " + b["rule"] for b in j.get("ban_hits", [])]
     return not why, why
 
 
-def judge_section(name, shots, exclude=""):
-    pass_ref = ", ".join(str(GALLERY / p) for p in [p for p in PASS_REFS if p != exclude][:2])
-    fail_ref = ", ".join(str(GALLERY / p) for p in [p for p in FAIL_REFS if p != exclude][:2])
-    wide = [p for p in shots if Path(p).name.startswith("1440")] or shots
+def judge_section(name, shots, pass_refs=(), fail_refs=()):
+    wide = [p for p in shots if Path(p).name.startswith(WIDE_PREFIX)] or shots
     sat = hot_share(wide)
-    j = ask(SECTION_TASK.format(pass_ref=pass_ref, fail_ref=fail_ref, name=name, sat=f"{sat:.2f} (toy above 0.20)",
-                                shots="\n".join(f"- {s}" for s in shots)) + "\n\nRUBRIC:\n" + RUBRIC, ("scores", "ban_hits", "explanatory_visual_present"))
+    j = ask(SECTION_TASK.format(refs=refs_text(list(pass_refs), list(fail_refs)), name=name,
+                                sat=f"{sat:.2f} (toy above {saturation.SECTION_MAX})",
+                                shots="\n".join(f"- {s}" for s in shots)) + "\n\nRUBRIC:\n" + RUBRIC,
+            ("scores", "ban_hits", "explanatory_visual_present"))
     ok, why = verdict(j)
     j["saturation"] = round(sat, 3)
-    if sat > 0.20:  # measured: ember v3 drift/access/revisions 0.35-0.64; approved pages 0.00-0.01
-        ok, why = False, why + [f"saturation: {sat:.2f} of the section's pixels are full-strength colour (toy palette; limit 0.20)"]
+    if sat > saturation.SECTION_MAX:
+        ok, why = False, why + [f"saturation: {sat:.2f} of the section's pixels are full-strength colour (limit {saturation.SECTION_MAX})"]
     j["pass"], j["fail_reasons"] = ok, why
     return j
 
 
-def judge_wow(shots, test=None):
-    j = ask(WOW_TASK.format(wow_pass=GALLERY / "accept-anhermon-v4-hero.webp",
-                            wow_nice=GALLERY / "nice-not-wow-meridian-logpanel.webp", wow_test=(test if test is not None else WOW_TEST) or "(none declared)",
+def judge_wow(shots, test=None, pass_refs=(), fail_refs=()):
+    j = ask(WOW_TASK.format(refs=refs_text(list(pass_refs), list(fail_refs)), wow_min=WOW_MIN,
+                            wow_test=(test if test is not None else WOW_TEST) or "(none declared)",
                             shots="\n".join(f"- {s}" for s in shots)) + "\n\nRUBRIC:\n" + RUBRIC, ("wow", "fallback", "motion_polish"))
-    if "error" not in j:
-        mid = [x for x in shots if "-t" in Path(x).name and "-rm-" not in Path(x).name]  # motion polish counts only with a real frame sequence
-        j["pass"] = (int(j["wow"]["score"]) >= 4 and int(j.get("fallback", {}).get("score", 0)) >= 3  # missing = not judged, never a pass
-                     and (len(mid) < 6 or int(j.get("motion_polish", {}).get("score", 0)) >= 4))
-    else:
+    if "error" in j:
         j["pass"] = False
+        return j
+    mid = [x for x in shots if "-t" in Path(x).name and "-rm-" not in Path(x).name]
+    j["pass"] = (int(j["wow"]["score"]) >= WOW_MIN and int(j.get("fallback", {}).get("score", 0)) >= FALLBACK_MIN  # missing = not judged
+                 and (len(mid) < MIN_MID_FRAMES or int(j.get("motion_polish", {}).get("score", 0)) >= MOTION_MIN))
+    return j
+
+
+def judge_page(shots, tells="(not run)", pass_refs=(), fail_refs=()):
+    have = bool(pass_refs and fail_refs)
+    j = ask(PAGE_TASK.format(refs=refs_text(list(pass_refs), list(fail_refs)), shots="\n".join(f"- {s}" for s in shots), tells=tells,
+                             sat=f"{hot_share(shots):.2f} (toy above {saturation.PAGE_MEAN_MAX})",
+                             closest=CLOSEST_Q if have else "", closest_key=CLOSEST_KEY if have else "") + "\n\nRUBRIC:\n" + RUBRIC,
+            ("could_be_20_others", "verdict"))
+    j["saturation"] = round(hot_share(shots), 3)
+    j["pass"] = page_pass(j, have) and j["saturation"] <= saturation.PAGE_MEAN_MAX
+    if j["saturation"] > saturation.PAGE_MEAN_MAX:
+        j.setdefault("fixes", []).append(f"saturation: {j['saturation']} of pixels at hot colour; neutral large fields, one small spot colour")
     return j
 
 
@@ -234,95 +285,113 @@ def line(name, j):
     return f"{'PASS' if j['pass'] else 'FAIL'}  {name:28} {s}  {'; '.join(j.get('fail_reasons', []))[:120]}"
 
 
-def calibrate():
-    cases = {  # anchor -> expected section pass
-        "reject-meridian-method.webp": False, "reject-thin-line-art.webp": False,
-        "reject-provenant-gold-plate.webp": False, "reject-provenant-v2-beige-boxes.webp": False,
-        "reject-anhermon-03364e9-serif-mono.webp": False,
-        "accept-anhermon-v4-guard-codedrawn.webp": True,
-        "reject-ember-v3-toy-fullbleed.webp": False,  # toy palette: measured saturation alone fails it
-        # informational (None): the critic is stricter than what shipped here; observed 2026-10-01 it fails the
-        # observe plate on whitespace (expl=3) and the log panel crop on polish/hierarchy (3). Kept to watch drift.
-        "accept-anhermon-v4-observe-plate.webp": None, "nice-not-wow-meridian-logpanel.webp": None,
-    }
+def calibrate(corpus):
+    """Judge each image in CORPUS/pass and CORPUS/fail alone; report disagreements with the labels."""
+    if not corpus or not Path(corpus, "pass").is_dir() or not Path(corpus, "fail").is_dir():
+        print(CORPUS_HOWTO)
+        return EXIT_USAGE
+    labelled = [(p, True) for p in sorted(Path(corpus, "pass").iterdir()) if p.suffix.lower() in IMG] + \
+               [(p, False) for p in sorted(Path(corpus, "fail").iterdir()) if p.suffix.lower() in IMG]
+    if not labelled:
+        print(CORPUS_HOWTO)
+        return EXIT_USAGE
     with ThreadPoolExecutor(int(os.environ.get("CRITIC_JOBS", 4))) as ex:
-        res = dict(zip(cases, ex.map(lambda a: judge_section(a, [str(GALLERY / a)], exclude=a), cases)))
-        wows = dict(zip(["accept-anhermon-v4-hero.webp", "nice-not-wow-meridian-logpanel.webp"],
-                        ex.map(lambda a: judge_wow([str(GALLERY / a)], {"accept-anhermon-v4-hero.webp": "A stranger would say: that agent run is drawn as light strands, one per span, and I can replay it", "nice-not-wow-meridian-logpanel.webp": "A stranger would say: a log search that narrows to the culprit line"}[a]), ["accept-anhermon-v4-hero.webp", "nice-not-wow-meridian-logpanel.webp"])))
-        pages = {"ember": ["reject-ember-hero-terminal.webp", "reject-ember-principles-cards.webp"],
-                 "pebble": ["approved-pebble-hero.webp", "approved-pebble-jar-maths.webp"],
-                 "halcyon": ["approved-halcyon-hero.webp", "approved-halcyon-instrument.webp"],
-                 "meridian": ["nice-not-wow-meridian-logpanel.webp", "reject-meridian-method.webp"],
-                 "ember-v3": ["reject-ember-v3-toy-hero.webp", "reject-ember-v3-toy-fullbleed.webp"]}
-        pres = dict(zip(pages, ex.map(lambda k: judge_page([str(GALLERY / f) for f in pages[k]], exclude=pages[k]), pages)))
+        res = list(ex.map(lambda pw: judge_section(pw[0].name, [str(pw[0])]), labelled))
     bad = 0
-    for k, want in {"ember": False, "pebble": True, "halcyon": True, "meridian": False, "ember-v3": False}.items():
-        ok = pres[k]["pass"] == want; bad += not ok
-        print(("ok    " if ok else "WRONG ") + f"page {k}: {'PASS' if pres[k]['pass'] else 'FAIL'} 20-others={pres[k].get('could_be_20_others')} closest={pres[k].get('closest_to')} tells={len(pres[k].get('tells_seen', []))} | {pres[k].get('verdict_in_angels_words', pres[k].get('error', ''))[:110]}")
-    for a, want in cases.items():
-        ok = want is None or res[a]["pass"] == want; bad += not ok
-        print(("info  " if want is None else "ok    " if ok else "WRONG ") + line(a, res[a]))
-    for a, want in {"accept-anhermon-v4-hero.webp": True, "nice-not-wow-meridian-logpanel.webp": False}.items():
-        ok = wows[a]["pass"] == want; bad += not ok
-        print(("ok    " if ok else "WRONG ") + f"wow {a}: {wows[a].get('wow', wows[a])}")
-    out = Path(os.environ.get("TMPDIR", "/tmp")) / "premium-web-calibration.json"
-    out.write_text(json.dumps({"sections": res, "wow": wows, "pages": pres}, indent=1))
-    print(f"{'CALIBRATED' if not bad else f'{bad} MISJUDGED'}; details {out}")
-    return 1 if bad else 0
+    for (p, want), j in zip(labelled, res):
+        ok = j["pass"] == want
+        bad += not ok
+        print(("ok    " if ok else "WRONG ") + f"[{'pass' if want else 'fail'}] " + line(p.name, j))
+    print(f"{'CALIBRATED' if not bad else f'{bad} of {len(labelled)} MISJUDGED'} (corpus {len(labelled)} images, focal min {FOCAL_MIN})")
+    return EXIT_FAIL if bad else EXIT_OK
 
 
-def main(a):
-    if a and a[0] == "--calibrate":
-        return calibrate()
-    if not a:
-        print(__doc__); return 2
-    root = Path(a[0]).resolve()
-    wow = a[a.index("--wow") + 1] if "--wow" in a else None
-    exempt = a[a.index("--wow-exempt") + 1] if "--wow-exempt" in a else None  # sub-pages only (a lib/fix page that inherits the site's wow); reason is printed
-    if exempt: print(f"WOW EXEMPT (sub-page): {exempt}")
-    if not wow and not exempt:  # 2026-10-04: wow was optional, so a page with no wow passed section scores. Now mandatory.
-        print("--wow <section-id> (or --wow-exempt REASON for sub-pages) is REQUIRED: a page with no judged signature moment cannot pass (see references/wow.md)"); return 2
+def update_history(root, results):
+    """Count consecutive failing runs per section; at MAX_ROUNDS tell the builder to replace the concept."""
+    f = root / HISTORY_FILE
+    try:
+        hist = json.loads(f.read_text())
+    except (OSError, json.JSONDecodeError):
+        hist = {}
+    for k, j in results.items():
+        hist[k] = 0 if j.get("pass") else hist.get(k, 0) + 1
+        if hist[k] >= MAX_ROUNDS:
+            j.setdefault("fixes", []).insert(0, f"ROUND BUDGET USED ({hist[k]} failing runs): replace this section's focal moment, do not polish it")
+    f.write_text(json.dumps(hist, indent=1))
+    return hist
+
+
+def build_parser():
+    ap = argparse.ArgumentParser(description="Independent section / wow / page critic", add_help=True)
+    ap.add_argument("dir", nargs="?", help="sections dir (one subdir of screenshots per section)")
+    ap.add_argument("--wow", help="id of the section dir holding the signature-moment frames")
+    ap.add_argument("--wow-test", default="", help="the written acceptance test for the wow")
+    ap.add_argument("--wow-exempt", help="sub-pages only: reason the page inherits its site's wow")
+    ap.add_argument("--pass-refs", help="folder of images the owner judged good")
+    ap.add_argument("--fail-refs", help="folder of images the owner judged bad")
+    ap.add_argument("--calibrate", nargs="?", const="", metavar="DIR", help="judge a labelled corpus DIR/pass, DIR/fail")
+    return ap
+
+
+def main(argv):
     global WOW_TEST
-    WOW_TEST = a[a.index("--wow-test") + 1] if "--wow-test" in a else ""
-    secs = {d.name: sorted(str(p) for p in d.iterdir() if p.suffix in IMG) for d in sorted(root.iterdir()) if d.is_dir() and not d.name.endswith("footer")}  # footer = chrome, judged at page level
+    a = build_parser().parse_args(argv)
+    if a.calibrate is not None:
+        return calibrate(a.calibrate)
+    if not a.dir:
+        print(__doc__)
+        return EXIT_USAGE
+    if not a.wow and not a.wow_exempt:
+        print("--wow <section-id> (or --wow-exempt REASON for sub-pages) is REQUIRED: a page with no judged signature moment cannot pass (references/wow.md)")
+        return EXIT_USAGE
+    if a.wow_exempt:
+        print(f"WOW EXEMPT (sub-page): {a.wow_exempt}")
+    WOW_TEST = a.wow_test
+    root = Path(a.dir).resolve()
+    pass_refs, fail_refs = ref_files(a.pass_refs), ref_files(a.fail_refs)
+    secs = {d.name: sorted(str(p) for p in d.iterdir() if p.suffix.lower() in IMG)
+            for d in sorted(root.iterdir()) if d.is_dir() and not d.name.endswith("footer")}  # footer = chrome, judged at page level
     secs = {k: v for k, v in secs.items() if v}
-    if not wow: wow = None
-    if wow and wow not in secs:
-        print(f"no frames for --wow {wow}"); return 2
+    if a.wow and a.wow not in secs:
+        print(f"no frames for --wow {a.wow}")
+        return EXIT_USAGE
+    w = None
     with ThreadPoolExecutor(int(os.environ.get("CRITIC_JOBS", 4))) as ex:
-        res = dict(zip([k for k in secs if k != "wow"], ex.map(lambda k: judge_section(k, secs[k]), [k for k in secs if k != "wow"])))
-        w = ex.submit(judge_wow, secs[wow]).result() if wow else None
+        names = [k for k in secs if k != a.wow]
+        res = dict(zip(names, ex.map(lambda k: judge_section(k, secs[k], pass_refs, fail_refs), names)))
+        if a.wow:
+            w = judge_wow(secs[a.wow], pass_refs=pass_refs, fail_refs=fail_refs)
         rep = root.parent / "report.json"
-        tells = next((v["eval"] for v in json.loads(rep.read_text()).values() if isinstance(v.get("eval"), dict) and "tells" in v["eval"]), None) if rep.exists() else None
-        w14 = {k: [p for p in v if Path(p).name.startswith("1440")] for k, v in secs.items() if k != "wow"}
-        # one shot from EVERY section first, then fill to 10: the first 10 in order saw only the top half of sealref
-        wide = [v[0] for v in w14.values() if v] + [p for v in w14.values() for p in v[1:]]
-        wide = wide[:10]
-        page = judge_page(wide, json.dumps({"hits": tells["hits"], "templaty": tells["templaty"]}) if tells else "(not run: add EVAL=scripts/tells.js)")
+        tells = None
+        if rep.exists():
+            tells = next((v["eval"] for v in json.loads(rep.read_text()).values() if isinstance(v.get("eval"), dict) and "tells" in v["eval"]), None)
+        w14 = {k: [p for p in secs[k] if Path(p).name.startswith(WIDE_PREFIX)] for k in names}
+        wide = [v[0] for v in w14.values() if v] + [p for v in w14.values() for p in v[1:]]  # one shot from EVERY section first, then fill
+        page = judge_page(wide[:PAGE_SHOT_LIMIT], json.dumps({"hits": tells["hits"], "templaty": tells["templaty"]}) if tells else
+                          "(not run: add EVAL=scripts/tells.js)", pass_refs, fail_refs)
         if tells and tells.get("craft_fail"):
-            page["pass"] = False
-            page["craft_fail"] = tells["craft_fail"]
-            print("CRAFT GATE FAIL (tells.js): " + ", ".join(tells["craft_fail"]) + "  [panel_run>3 consecutive boxed sections | scale_change<2 | type_scale<4x | wow not above the fold]")
+            page["pass"], page["craft_fail"] = False, tells["craft_fail"]
+            print("CRAFT GATE FAIL (tells.js): " + ", ".join(tells["craft_fail"]) + "  [panel_run | scale_change | type_scale | wow not above the fold]")
         if tells and tells["templaty"]:
-            page["pass"] = False
-            page["dom_templaty"] = tells["hits"]
+            page["pass"], page["dom_templaty"] = False, tells["hits"]
+    update_history(root, res)
     for k, j in res.items():
         print(line(k, j))
         for f in j.get("fixes", [])[:3]:
             print("      fix:", f[:160])
     if w:
-        print(f"{'PASS' if w['pass'] else 'FAIL'}  WOW {wow}: {w.get('wow', w)}  fallback={w.get('fallback')}")
-    print(f"{'PASS' if page['pass'] else 'FAIL'}  PAGE could_be_20_others={page.get('could_be_20_others')} closest={page.get('closest_to')} "
-          f"tells={[t.get('tell') for t in page.get('tells_seen', [])]} dom={page.get('dom_templaty', '-')}\n      {page.get('verdict_in_angels_words', page.get('error', ''))}")
+        print(f"{'PASS' if w['pass'] else 'FAIL'}  WOW {a.wow}: {w.get('wow', w)}  fallback={w.get('fallback')}")
+    print(f"{'PASS' if page['pass'] else 'FAIL'}  PAGE could_be_20_others={page.get('could_be_20_others')} closest={page.get('closest_to', '-')} "
+          f"tells={[t.get('tell') for t in page.get('tells_seen', [])]} dom={page.get('dom_templaty', '-')}\n      {page.get('verdict', page.get('error', ''))}")
     (root / "critic.json").write_text(json.dumps({"sections": res, "wow": w, "page": page}, indent=1))
-    ok = all(j["pass"] for j in res.values()) and (w is None and bool(exempt) or (w is not None and w["pass"])) and page["pass"]
+    ok = all(j["pass"] for j in res.values()) and (bool(a.wow_exempt) if w is None else w["pass"]) and page["pass"]
     errs = {k: v["error"] for k, v in list(res.items()) + [("wow", w or {}), ("page", page)] if "error" in v}
     if errs:  # a quota/session limit is not a verdict: those parts are unknown, never reported as failed designs
         print(f"CRITIC UNAVAILABLE for {', '.join(errs)}: {next(iter(errs.values())).strip()[-160:]}")
         print("Re-run when the limit resets (or CRITIC=codex); exit 3 = unknown, not failed.")
-        return 3
+        return EXIT_UNAVAILABLE
     print(f"{'ALL SECTIONS PASS' if ok else 'NOT DONE: fix the failing sections and re-shoot'}; {root / 'critic.json'}")
-    return 0 if ok else 1
+    return EXIT_OK if ok else EXIT_FAIL
 
 
 if __name__ == "__main__":

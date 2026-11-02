@@ -1,0 +1,3 @@
+schema_version: "1.0"
+name: premium-web-webgl-triggers-on-blank-headless-frames
+runs: 1

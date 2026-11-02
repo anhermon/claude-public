@@ -1,0 +1,5 @@
+.selftest/
+raw/
+public/
+prompts.json
+__pycache__/

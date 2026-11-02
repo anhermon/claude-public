@@ -1,0 +1,29 @@
+{
+  "id": "fig-lat",
+  "kind": "bars",
+  "trigger": "inview",
+  "width": 640,
+  "unit": " ms",
+  "title": "Median request latency by stage",
+  "desc": "Median latency in milliseconds: gateway 12, policy check 31, model 480, response formatting 9. The model call dominates.",
+  "source": "Illustrative numbers for the template, not a measurement.",
+  "values": [
+    {
+      "label": "Gateway",
+      "value": 12
+    },
+    {
+      "label": "Policy check",
+      "value": 31
+    },
+    {
+      "label": "Model",
+      "value": 480,
+      "highlight": true
+    },
+    {
+      "label": "Response",
+      "value": 9
+    }
+  ]
+}

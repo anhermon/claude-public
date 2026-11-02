@@ -1,7 +1,19 @@
 {
   "name": "premium-web",
-  "version": "1.0.0",
-  "description": "Build premium, studio-quality web pages with a calibrated critic loop, a mandatory signature 'wow' moment, section-level rubric, genre-escape checks and image generation.",
-  "author": { "name": "Angel Hermon" },
-  "keywords": ["web", "design", "landing-page", "frontend", "critic", "imagegen"]
+  "version": "2.0.0",
+  "description": "Build premium web pages that do not look AI-generated: a spec-before-code process, a causal model of why generated sites look generic, a render-and-look loop with an independent critic, and sub-skills for motion, WebGL, SVG and generated imagery.",
+  "author": {
+    "name": "Angel Hermon"
+  },
+  "keywords": [
+    "web",
+    "design",
+    "landing-page",
+    "frontend",
+    "critic",
+    "motion",
+    "webgl",
+    "svg",
+    "imagery"
+  ]
 }

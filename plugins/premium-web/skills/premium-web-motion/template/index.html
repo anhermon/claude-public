@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Motion grammar demo</title><link rel="icon" href="data:,">
+<link rel="stylesheet" href="motion.css">
+<style>
+  :root { --stage-bg: #0b0c10; --stage-fg: #f4f1ea; --stage-accent: #7fa2ff; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07080b; color: #f4f1ea; font: 400 16px/1.5 var(--ck-font-sans); -webkit-font-smoothing: antialiased; }
+  h1, h2 { margin: 0; font-weight: 300; letter-spacing: -0.035em; line-height: 0.98; }
+  h1 { font-size: clamp(44px, 9vw, 140px); } h2 { font-size: clamp(34px, 6vw, 88px); }
+  p { max-width: 46ch; margin: 0; opacity: 0.78; }
+  .mono { font: 500 12px/1 var(--ck-font-mono); letter-spacing: 0.18em; text-transform: uppercase; opacity: 0.7; }
+  .hero { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: flex-end; gap: 24px; padding: clamp(24px, 6vw, 96px);
+    background: radial-gradient(ellipse 80% 60% at 70% 20%, #2a3b6b, #0b0c10 70%); }
+  .stats { display: flex; gap: 48px; } .stats b { display: block; font: 300 clamp(36px, 5vw, 64px)/1 var(--ck-font-sans); }
+  [data-stage] { height: 400vh; } [data-stage] .pin { display: grid; align-content: center; gap: 24px; padding: clamp(24px, 6vw, 96px); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--stage-accent); }
+  .steps { display: grid; } .steps > * { grid-area: 1 / 1; }
+  .rail-wrap { overflow: hidden; } [data-rail] { display: flex; gap: 20px; width: max-content; padding-right: 8vw; }
+  .card { background: color-mix(in srgb, var(--stage-fg) 12%, transparent); border-color: color-mix(in srgb, var(--stage-fg) 22%, transparent); flex: none; width: min(70vw, 420px); aspect-ratio: 4/5; padding: 24px; display: flex; align-items: flex-end; font: 300 28px/1.1 var(--ck-font-sans); }
+  .sec { min-height: 100vh; min-height: 100svh; padding: clamp(24px, 6vw, 96px); display: flex; flex-direction: column; justify-content: flex-end; gap: 20px; background: #101218; }
+  .sec.light { background: #f1ede4; color: #14161a; justify-content: center; }
+  .sec:nth-child(3) { background: #1a2340; }
+  [data-fullbleed] { will-change: clip-path; }
+  a, button { color: inherit; } :focus-visible { outline: 2px solid #8ab4ff; outline-offset: 3px; }
+</style></head>
+<body class="finish">
+<nav class="nav-island glass" aria-label="Primary"><a href="#hero" aria-current="true">Arrival</a><a href="#stage">Method</a><a href="#stack">Proof</a><a href="#end" data-cursor>Contact</a></nav>
+
+<header class="hero" id="hero" data-fullbleed>
+  <p class="mono" data-motion="typewriter" data-motion-when="entrance">studio / est. 2026 / online</p>
+  <h1 data-motion="blur-line" data-motion-when="entrance">One persistent object,<br>four chapters of light.</h1>
+  <p data-motion="word-blur" data-motion-when="entrance" data-motion-delay="0.4">A demo of the motion grammar: entrance, reveals, one pinned stage, colour hand-offs, rail, stepper, curtain overlap.</p>
+  <div class="stats" data-motion="stagger-grid" data-motion-when="entrance" data-motion-delay="0.6">
+    <div><b data-motion="count-up" data-motion-when="entrance">1,240</b><span class="mono">units</span></div>
+    <div><b>99.9%</b><span class="mono">uptime</span></div>
+  </div>
+</header>
+
+<section data-stage id="stage" aria-label="Method">
+  <div class="pin">
+    <span class="mono" data-motion="scramble">Chapter index follows the scroll</span>
+    <div class="steps" aria-live="polite">
+      <h2 data-step>Arrive.</h2><h2 data-step>Shift the light.</h2><h2 data-step>Show the proof.</h2>
+    </div>
+    <div class="dot" aria-hidden="true"></div>
+    <div class="rail-wrap"><div data-rail>
+      <div class="card glass">One</div><div class="card glass">Two</div><div class="card glass">Three</div><div class="card glass">Four</div><div class="card glass">Five</div>
+    </div></div>
+  </div>
+</section>
+
+<div id="stack" data-curtain>
+  <section class="sec"><span class="mono">04 / Overlap</span><h2 data-motion="mask-line">The next panel slides over this one.</h2><p>It steps back, dims and rounds its corners.</p></section>
+  <section class="sec light"><span class="mono">05 / Hand-off</span><h2 data-motion="mask-line">Dark to light by overlap.</h2></section>
+  <section class="sec"><span class="mono">06 / Close</span><h2 id="end" data-motion="blur-line">Done.</h2></section>
+</div>
+
+<script type="module">
+  import { CONFIG } from './motion.config.js';
+  import { startMotion } from './src/motion.js';
+  const q = new URLSearchParams(location.search);
+  const overrides = {};
+  if (q.get('reduced') === '1') overrides.reduced = true;
+  const loader = q.get('noloader') ? { type: 'none' } : q.get('loader') ? { type: q.get('loader'), options: {} } : CONFIG.loader; // ?loader=hole-expand|slab-to-node|curtain-progress
+  const m = startMotion({ ...CONFIG, loader }, overrides);
+  window.__motion = m;
+  m.loader ? m.loader.done.then(() => (document.documentElement.dataset.ready = '1')) : (document.documentElement.dataset.ready = '1');
+</script>
+</body></html>

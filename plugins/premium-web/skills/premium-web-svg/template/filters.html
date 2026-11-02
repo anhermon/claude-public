@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SVG filters demo</title><link rel="icon" href="favicon.svg">
+<style>
+  :root { color-scheme: dark; } html { background: #0b0c0f; } body { margin: 0; padding: 24px; font: 14px system-ui, sans-serif; color: #eee; display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  figure { margin: 0; } figcaption { opacity: .7; margin-top: 8px; } svg { width: 100%; height: auto; display: block; background: #15171c; border-radius: 12px; }
+</style></head>
+<body>
+<!-- 1. gooey: blur then threshold the alpha channel; blobs merge when they touch. Blur stdDeviation <= 12 and a small filter region keep it cheap. -->
+<figure><svg viewBox="0 0 280 160" role="img" aria-label="Three circles merging like liquid">
+  <defs><filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="8" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"/></filter></defs>
+  <g filter="url(#goo)" fill="#e4572e"><circle cx="110" cy="80" r="34"/><circle cx="160" cy="80" r="26"/><circle cx="195" cy="62" r="14"/></g></svg>
+  <figcaption>gooey: blur + alpha threshold</figcaption></figure>
+<!-- 2. displacement: feTurbulence drives feDisplacementMap; scale <= 20 keeps text legible. baseFrequency is per user unit. -->
+<figure><svg viewBox="0 0 280 160" role="img" aria-label="Wavy line text distorted by turbulence">
+  <defs><filter id="wob" x="-5%" y="-20%" width="110%" height="140%"><feTurbulence type="fractalNoise" baseFrequency=".012 .04" numOctaves="2" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter></defs>
+  <text x="140" y="92" text-anchor="middle" font-size="44" font-weight="700" fill="#f4ede4" filter="url(#wob)">Liquid</text></svg>
+  <figcaption>displacement: turbulence map, scale 14</figcaption></figure>
+<!-- 3. grain: feTurbulence composited over a flat fill; static (no animated filter), the cheap way to kill flat vector fills. -->
+<figure><svg viewBox="0 0 280 160" role="img" aria-label="Flat orange field with film grain">
+  <defs><filter id="grain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" result="n"/><feColorMatrix in="n" type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .22"/></feComponentTransfer><feBlend in="SourceGraphic" mode="multiply"/></filter></defs>
+  <rect width="280" height="160" fill="#e4572e" filter="url(#grain)"/></svg>
+  <figcaption>grain: turbulence over a flat fill</figcaption></figure>
+</body></html>

@@ -1,0 +1,90 @@
+{
+  "id": "fig-gate",
+  "kind": "diagram",
+  "trigger": "inview",
+  "width": 800,
+  "height": 230,
+  "title": "Every request passes a policy check before it reaches the model",
+  "desc": "Left to right: Client, Gateway, Policy check, Model, Response. The policy check can reject a request, which returns to the client without calling the model.",
+  "nodes": [
+    {
+      "id": "c",
+      "label": "Client",
+      "x": 10,
+      "y": 90,
+      "w": 110,
+      "h": 56
+    },
+    {
+      "id": "g",
+      "label": "Gateway",
+      "sub": "auth, rate limit",
+      "x": 160,
+      "y": 90,
+      "w": 130,
+      "h": 56
+    },
+    {
+      "id": "p",
+      "label": "Policy check",
+      "sub": "rules + allowlist",
+      "x": 330,
+      "y": 90,
+      "w": 140,
+      "h": 56,
+      "accent": true
+    },
+    {
+      "id": "m",
+      "label": "Model",
+      "x": 540,
+      "y": 90,
+      "w": 100,
+      "h": 56
+    },
+    {
+      "id": "r",
+      "label": "Response",
+      "x": 700,
+      "y": 90,
+      "w": 90,
+      "h": 56
+    }
+  ],
+  "edges": [
+    {
+      "from": "c",
+      "to": "g"
+    },
+    {
+      "from": "g",
+      "to": "p"
+    },
+    {
+      "from": "p",
+      "to": "m",
+      "label": "allowed"
+    },
+    {
+      "from": "m",
+      "to": "r"
+    }
+  ],
+  "callouts": [
+    {
+      "node": "p",
+      "side": "top",
+      "text": [
+        "The only place a request",
+        "can be rejected"
+      ],
+      "dy": 34
+    },
+    {
+      "node": "m",
+      "side": "bottom",
+      "text": "never sees rejected input",
+      "dy": 30
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "_doc": "One style sheet + seed for the WHOLE asset set. Edit this file; pipeline.py reads it. See references/art-direction.md.",
+  "style": {
+    "palette": { "ground": "#0E0F12", "accent": "#7FA2FF", "highlight": "#ECE8DC" },
+    "light": "one soft key light from upper left, long falloff",
+    "material": "matte ceramic and brushed metal, no glossy plastic",
+    "grain": "fine film grain",
+    "mood": "calm, expensive, quiet",
+    "seed": 424242,
+    "negative": "no text, letters, numbers, watermarks, logos, user interface, people, faces, hands"
+  },
+  "slots": {
+    "hero": { "aspect": "3:2", "note": "Subject in the right third; the left 40% stays dark and empty for the headline." },
+    "plate": { "aspect": "4:5", "note": "Single clear subject, centred, breathing room on all sides." },
+    "backdrop": { "aspect": "16:9", "note": "No focal point; even low-contrast field that text can sit on." }
+  },
+  "assets": [
+    { "id": "hero", "slot": "hero", "brief": "a single brushed-metal ring standing on edge on a dark stone plinth, a thin band of accent light across its inner face", "trim": false },
+    { "id": "plate-a", "slot": "plate", "brief": "a close-up of fine metal pins in a row along a glowing line on dark wood" },
+    { "id": "backdrop", "slot": "backdrop", "brief": "soft dark gradient with faint dust particles" }
+  ],
+  "post": {
+    "widths": [640, 1024, 1536],
+    "formats": ["avif", "webp"],
+    "matte": "#0E0F12",
+    "grade": { "contrast": 1.04, "saturation": 0.95, "brightness": 1.0 },
+    "grain_amount": 0.035,
+    "budget_kb": { "hero": 180, "plate": 90, "backdrop": 60 },
+    "default_budget_kb": 90
+  },
+  "paths": { "raw": "raw", "out": "public/img" }
+}

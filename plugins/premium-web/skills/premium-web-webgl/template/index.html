@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebGL template demo</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --fg: #f4ede4; --muted: rgba(244, 237, 228, .68); --gutter: clamp(20px, 6vw, 96px); font-family: "Helvetica Neue", Arial, sans-serif; }
+  * { box-sizing: border-box; }
+  html { background: #020101; }   /* only html: a body background would paint over the z-index:-1 stage */
+  body { margin: 0; color: var(--fg); }
+  main { position: relative; }
+  section { min-height: 100svh; display: flex; align-items: center; padding: 0 var(--gutter); }
+  .copy { max-width: 30rem; }
+  .right { justify-content: flex-end; }
+  h1, h2 { font-size: clamp(2.4rem, 6vw, 5rem); line-height: 1; margin: 0 0 1rem; letter-spacing: -0.02em; font-weight: 600; }
+  p { color: var(--muted); font-size: 1.05rem; line-height: 1.5; margin: 0; }
+  .field { position: relative; min-height: 80svh; overflow: hidden; }
+  .field .copy { position: relative; z-index: 1; }
+  @media (max-width: 760px) { section { align-items: flex-start; padding-top: 12svh; } .right { justify-content: flex-start; } }
+</style>
+</head>
+<body>
+<main>
+  <section id="s0"><div class="copy"><h1>One object, held across the page.</h1><p>A fixed canvas sits behind the scrolling copy. Scroll progress drives the shape.</p></div></section>
+  <section id="s1" class="right"><div class="copy"><h2>It changes shape.</h2><p>Points flow from sphere to torus with a staggered ramp and mid-flight turbulence.</p></div></section>
+  <section class="field" data-field><div class="copy"><h2>A shader field.</h2><p>Full-screen fragment shader, rendered small and upscaled, with grain and dither.</p></div></section>
+  <section id="s2"><div class="copy"><h2>It stays lit.</h2><p>Key light, rim light, fog and a dimmer far side give the cloud volume.</p></div></section>
+</main>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

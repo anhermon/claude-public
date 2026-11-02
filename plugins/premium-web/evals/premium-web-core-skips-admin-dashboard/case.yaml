@@ -1,0 +1,3 @@
+schema_version: "1.0"
+name: premium-web-core-skips-admin-dashboard
+runs: 1
