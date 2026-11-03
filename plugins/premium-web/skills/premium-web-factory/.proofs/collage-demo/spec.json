@@ -1,0 +1,24 @@
+{
+  "name":"Roughen",
+  "grammar":"collage",
+  "concept":{"notice":"Fictional paper and type workshop / concept edition","noticeShort":"Fictional workshop","description":"An invented paper workshop composed from oversized type, flat color and a photograph-free cut paper plate."},
+  "direction":{
+    "palette":{"ground":"#efbaa4","ink":"#231b20","inkSoft":"#47333c","accent":"#a8374c"},
+    "fonts":{"display":{"id":"archivo-black","family":"Archivo Black","weight":900},"body":{"id":"work-sans","family":"Work Sans"}},
+    "ground":[{"base":"#efbaa4","glow":{"colors":["#f4ccb5","#efbaa4","#efbaa4"]}}]
+  },
+  "collage":{
+    "words":["MAKE","a","MARK"],
+    "palette":["#efbaa4","#c7c4ec","#f2dc80","#b7d1c6"],
+    "blocks":[{"label":"01 / Cut","caption":"Start with a shape. Keep the offcuts.","color":2},{"label":"02 / Shift","caption":"Move a little. Let the tension show.","color":1},{"label":"03 / Keep","caption":"Choose the accident worth repeating.","color":3}],
+    "marquee":"ROUGHEN / PAPER HAS A MEMORY / TYPE HAS A VOICE / MADE TO BE MOVED"
+  },
+  "chapters":[
+    {"id":"imprint","archetype":"collage","nav":"Imprint","copy":{"title":"An imperfect first impression.","deck":"An imagined workshop for people who think with their hands. Push the type around. Leave a little evidence."}},
+    {"id":"offcuts","archetype":"collage","nav":"Offcuts","copy":{"title":"The edges are the beginning.","deck":"A circle, a fold, a stubborn strip of paper. Our fictional first edition starts with what another process leaves behind."}},
+    {"id":"tension","archetype":"collage","copy":{"title":"Give the letters some room to argue.","deck":"Heavy meets light. Upright meets slanted. Scale does the talking before a sentence has even begun."}},
+    {"id":"register","archetype":"collage","nav":"Register","copy":{"title":"Almost in register.","deck":"Shift one element by a breath. Watch a tidy arrangement become a composition with a point of view."}},
+    {"id":"edition","archetype":"collage","copy":{"title":"Keep the useful accident.","deck":"Every cutout carries a small instruction. Hover, focus or tap to read the notes. On a phone, every note stays in view."}},
+    {"id":"colophon","archetype":"collage","nav":"Colophon","copy":{"title":"A page with fingerprints.","deck":"No photographs, no borrowed marks. Just language, paper color and an SVG study. Roughen is a fictional workshop; this edition is a visual experiment."}}
+  ]
+}

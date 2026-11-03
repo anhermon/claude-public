@@ -1,0 +1,62 @@
+{
+  "name": "Vellumet",
+  "grammar": "rail",
+  "concept": {
+    "notice": "Fictional print dispatch concept / sample data",
+    "noticeShort": "Fictional study",
+    "description": "Vellumet is an invented print dispatch service. A typographic rail explains its fictional paper-routing process. All figures and prices are illustrative."
+  },
+  "direction": {
+    "palette": { "ground": "#171411", "ink": "#f4eee4", "inkSoft": "#c1b5a1", "accent": "#f7b948" },
+    "fonts": {
+      "display": { "id": "barlow-condensed", "family": "Barlow Condensed", "weight": 600 },
+      "body": { "id": "public-sans", "family": "Public Sans" },
+      "mono": { "id": "ibm-plex-mono", "family": "IBM Plex Mono" }
+    },
+    "ground": [
+      { "base": "#171411", "accent": "#f7b948", "glow": { "colors": ["#f7b948", "#63401b", "#201910"] } },
+      { "base": "#201811", "accent": "#e4a341", "glow": { "colors": ["#e4a341", "#60421c", "#201811"] } },
+      { "base": "#171813", "accent": "#d2bc74", "glow": { "colors": ["#d2bc74", "#544a26", "#171813"] } },
+      { "base": "#211a13", "accent": "#f4c366", "glow": { "colors": ["#f4c366", "#634424", "#211a13"] } },
+      { "base": "#171411", "accent": "#f7b948", "glow": { "colors": ["#f7b948", "#63401b", "#201910"] } },
+      { "base": "#171411", "accent": "#f7b948", "glow": { "colors": ["#f7b948", "#63401b", "#201910"] } }
+    ]
+  },
+  "rail": {
+    "panels": [
+      { "id": "paper", "title": "Paper in motion", "eyebrow": "Dispatch study 01", "nav": "Study",
+        "copy": "A small edition deserves a clear route. Follow an imagined print run from first fold to final handoff.",
+        "figure": { "kind": "stat", "value": "24", "label": "Illustrative editions per dispatch" } },
+      { "id": "sequence", "title": "A considered sequence", "eyebrow": "From desk to doorstep",
+        "copy": "One deliberate step at a time. Nothing disappears into an unlabelled queue.",
+        "figure": { "kind": "timeline", "items": ["Receive the edition", "Check the fold", "Wrap and route", "Record the handoff"], "label": "Fictional workflow / four stages" } },
+      { "id": "routing", "title": "Every fold connects", "eyebrow": "A route you can read", "nav": "Route",
+        "copy": "The route is the interface: three clear points, one continuous line, and a visible next move.",
+        "figure": { "kind": "diagram", "items": ["Studio", "Dispatch", "Reader"], "label": "Illustrative routing diagram" } },
+      { "id": "seal", "title": "Ready to travel", "eyebrow": "Dispatch study 04",
+        "copy": "Give the work a fitting send-off. Explore a sample dispatch estimate below.",
+        "figure": { "kind": "quote-free", "value": "An edition, considered.", "label": "Procedural edition seal / no testimonial" } }
+    ],
+    "params": { "damping": 0.12, "panelVw": 100, "scrollRatio": 1, "velocityMax": 1.2, "ambientLines": 12, "transition": "wipe" }
+  },
+  "chapters": [
+    { "id": "estimate", "archetype": "pricing", "nav": "Estimate", "copy": { "title": "Plan a dispatch.", "deck": "A working calculator with invented sample prices.", "fine": "Fictional service. No orders or payments are collected." } },
+    { "id": "questions", "archetype": "faq", "nav": "Questions", "copy": { "title": "Before it travels." } }
+  ],
+  "commerce": {
+    "currency": "$",
+    "inputs": [
+      { "id": "a", "label": "Editions", "min": 10, "max": 200, "step": 10, "value": 40 },
+      { "id": "b", "label": "Routes", "min": 1, "max": 10, "step": 1, "value": 2 }
+    ],
+    "tiers": [
+      { "name": "Small run", "fixed": 24, "included": { "a": 20, "b": 1 }, "rates": { "a": 2, "b": 8 }, "cap": { "a": 100 }, "bullets": ["Illustrative studio dispatch"] },
+      { "name": "Edition run", "fixed": 96, "included": { "a": 80, "b": 4 }, "rates": { "a": 1, "b": 6 }, "bullets": ["Illustrative multi-route dispatch"] }
+    ],
+    "faq": [
+      { "q": "Is Vellumet a real service?", "a": "No. This is a fictional concept with sample figures and prices." },
+      { "q": "Can I place an order?", "a": "No. The controls demonstrate a calculator and do not submit data." },
+      { "q": "What happens on a phone?", "a": "The same studies become a readable vertical sequence, followed by this calculator and these questions." }
+    ]
+  }
+}

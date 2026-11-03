@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ARCHETYPES } from '../../archetypes/index.mjs';
+import { CODE_GRAMMARS, GRAMMAR_TERMINAL, GRAMMAR_COLLAGE } from './const.mjs';
 import { SUBJECT_DEFAULTS, DEFAULT_PLACE, MOBILE_MAX_W_DEFAULT, DEFAULT_BUDGETS, WORLD_STOPS, GRAMMAR_MORPH, GRAMMAR_RAIL, HERO_DEFAULTS, SCROLL_DEFAULTS, READOUT_DEFAULT, RAIL_DEFAULTS, MORPH_MIN_CHAPTERS } from './const.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,7 @@ export function validate(v, schema, root = schema, at = '$') {
   if (typeof v === 'string') {
     if (schema.pattern && !new RegExp(schema.pattern).test(v)) errs.push(`${at}: does not match ${schema.pattern}`);
     if (schema.minLength && v.length < schema.minLength) errs.push(`${at}: shorter than ${schema.minLength}`);
+    if (schema.maxLength && v.length > schema.maxLength) errs.push(`${at}: longer than ${schema.maxLength}`);
   }
   if (typeof v === 'number') {
     if (schema.minimum != null && v < schema.minimum) errs.push(`${at}: below ${schema.minimum}`);
@@ -56,24 +58,38 @@ export function loadSpec(file) {
   const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
   const errs = validate(spec, schema);
   if (errs.length) throw new Error('spec invalid:\n  ' + errs.join('\n  '));
-  const rail = spec.grammar === GRAMMAR_RAIL;
+  const rail = spec.grammar === GRAMMAR_RAIL, terminal = spec.grammar === GRAMMAR_TERMINAL, collage = spec.grammar === GRAMMAR_COLLAGE;
+  const codeOnly = CODE_GRAMMARS.includes(spec.grammar);
   const warnings = [];
   const ids = new Set();
   (spec.chapters || []).forEach((c, i) => {
     if (ids.has(c.id)) errs.push(`chapters[${i}]: duplicate id "${c.id}"`);
     ids.add(c.id);
     const a = ARCHETYPES[c.archetype];
+    if (collage && c.archetype !== GRAMMAR_COLLAGE) errs.push(`chapters[${i}]: collage accepts only collage chapters`);
+    if (!collage && c.archetype === GRAMMAR_COLLAGE) errs.push(`chapters[${i}]: collage chapter requires grammar collage`);
+    if (terminal && !['pricing', 'faq'].includes(c.archetype)) errs.push(`chapters[${i}]: terminal accepts only pricing and faq after its session`);
     if (!a) return;
     for (const k of a.meta.copyRequired) if (c.copy?.[k] == null) errs.push(`chapters[${i}] (${c.archetype}).copy: missing "${k}"`);
-    if (!rail && a.meta.needsTarget && !c.target) errs.push(`chapters[${i}] (${c.archetype}): needs a "target" layout`);
+    if (!codeOnly && a.meta.needsTarget && !c.target) errs.push(`chapters[${i}] (${c.archetype}): needs a "target" layout`);
     if (a.meta.needsCommerce && !spec.commerce) errs.push(`chapters[${i}] (${c.archetype}): needs top-level "commerce"`);
     if (rail && !['pricing', 'faq'].includes(c.archetype)) errs.push(`chapters[${i}]: rail accepts only pricing and faq after its panels`);
   });
-  if (!rail && spec.chapters?.length < MORPH_MIN_CHAPTERS) errs.push(`chapters: needs >= ${MORPH_MIN_CHAPTERS} items`);
-  if (!rail && spec.chapters && spec.chapters[0]?.archetype !== 'hero') errs.push('chapters[0]: must be the hero archetype');
-  if (!rail && spec.rail) errs.push('rail: only valid for grammar rail');
+  if (!codeOnly && spec.chapters?.length < MORPH_MIN_CHAPTERS) errs.push(`chapters: needs >= ${MORPH_MIN_CHAPTERS} items`);
+  if (!codeOnly && spec.chapters && spec.chapters[0]?.archetype !== 'hero') errs.push('chapters[0]: must be the hero archetype');
+  for (const grammar of CODE_GRAMMARS) if (spec[grammar] && spec.grammar !== grammar) errs.push(`${grammar}: only valid for grammar ${grammar}`);
+  if (codeOnly) for (const k of ['subject', 'hero', 'readout', 'scroll']) if (spec[k]) errs.push(`${k}: not used by grammar ${spec.grammar}; omit it`);
+  if (terminal) spec.terminal.session.forEach((s, i) => {
+    if (ids.has(s.id)) errs.push(`terminal.session[${i}]: duplicate id "${s.id}"`);
+    ids.add(s.id);
+    if (['diagram', 'timeline'].includes(s.pane.kind) && !s.pane.items) errs.push(`terminal.session[${i}].pane: needs items`);
+    if (s.pane.kind === 'stat' && !s.pane.value) errs.push(`terminal.session[${i}].pane: needs value`);
+  });
+  if (collage) {
+    spec.collage.blocks.forEach((b, i) => { if (b.color >= spec.collage.palette.length) errs.push(`collage.blocks[${i}].color: palette index out of range`); });
+    spec.chapters.forEach((c, i) => { if (!c.copy?.title || !c.copy?.deck) errs.push(`chapters[${i}].copy: title and deck required`); });
+  }
   if (rail) {
-    for (const k of ['subject', 'hero', 'readout', 'scroll']) if (spec[k]) errs.push(`${k}: not used by grammar rail; omit it`);
     spec.rail.panels.forEach((p, i) => {
       if (ids.has(p.id)) errs.push(`rail.panels[${i}]: duplicate id "${p.id}"`);
       ids.add(p.id);
@@ -88,7 +104,7 @@ export function loadSpec(file) {
 }
 
 function normalise(spec, warnings) {
-  const rail = spec.grammar === GRAMMAR_RAIL, subject = spec.subject || { kind: 'none' };
+  const rail = spec.grammar === GRAMMAR_RAIL, codeOnly = CODE_GRAMMARS.includes(spec.grammar), subject = spec.subject || { kind: 'none' };
   const kind = subject.kind, sd = SUBJECT_DEFAULTS[kind] || SUBJECT_DEFAULTS['glass-lattice'];
   const items = subject.items ?? sd.items;
   const slug = spec.slug || spec.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -97,12 +113,12 @@ function normalise(spec, warnings) {
   // acts: chapters with a target, in order; others hold the previous act
   let act = -1;
   const chapters = (spec.chapters || []).map((c, i) => {
-    if (c.target || rail) act += 1;
+    if (c.target || codeOnly) act += 1;
     const place = merge(DEFAULT_PLACE, c.place);
     const textSide = place.desktop === 'left' ? 'right' : place.desktop === 'right' ? 'left' : 'center';
-    return { ...c, index: i, act: Math.max(act, 0), hasTarget: !!c.target, place, textSide, copy: c.copy || {}, params: merge(ARCHETYPES[c.archetype].meta.params, c.params) };
+    return { ...c, index: i, act: Math.max(act, 0), hasTarget: !!c.target, place, textSide, copy: c.copy || {}, params: merge(ARCHETYPES[c.archetype]?.meta.params, c.params) };
   });
-  const nActs = rail ? spec.rail.panels.length + chapters.length : act + 1;
+  const nActs = rail ? spec.rail.panels.length + chapters.length : spec.grammar === GRAMMAR_TERMINAL ? spec.terminal.session.length + chapters.length : act + 1;
   if (spec.direction.ground.length < nActs) warnings.push(`ground has ${spec.direction.ground.length} entries for ${nActs} acts: last entry repeats`);
   const worlds = Array.from({ length: nActs }, (_, k) => spec.direction.ground[Math.min(k, spec.direction.ground.length - 1)]).map((g) => ({
     base: g.base, accent: g.accent || palette.accent, grain: g.light ? 0.04 : 0.05, light: !!g.light,
@@ -142,8 +158,10 @@ function normalise(spec, warnings) {
     }
   }
   if (rail) {
-    delete piece.subject;
     piece.rail = { panels: spec.rail.panels, params: merge(RAIL_DEFAULTS, spec.rail.params) };
   }
+  if (codeOnly) delete piece.subject;
+  if (spec.terminal) piece.terminal = spec.terminal;
+  if (spec.collage) piece.collage = spec.collage;
   return { piece };
 }

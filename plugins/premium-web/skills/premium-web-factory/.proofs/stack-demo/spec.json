@@ -1,0 +1,48 @@
+{
+  "name": "Resonae",
+  "grammar": "morph-subject",
+  "hero": { "layout": "stack", "wordmark": false },
+  "readout": "inline",
+  "scroll": { "mode": "orbit" },
+  "concept": {
+    "notice": "Fictional acoustic score archive / sample data",
+    "noticeShort": "Fictional study",
+    "description": "Resonae is an invented archive of acoustic scores. A centered title introduces a glass ring that holds its form as the camera explores it."
+  },
+  "direction": {
+    "palette": { "ground": "#141226", "ink": "#f4f0ff", "inkSoft": "#b4acd2", "accent": "#a397ff" },
+    "fonts": {
+      "display": { "id": "cormorant-garamond", "family": "Cormorant Garamond", "weight": 400, "fallback": "serif" },
+      "body": { "id": "manrope", "family": "Manrope" },
+      "mono": { "id": "inconsolata", "family": "Inconsolata" }
+    },
+    "ground": [
+      { "base": "#141226", "accent": "#a397ff", "glow": { "at": [0.5, 0.85], "colors": ["#dad3ff", "#6250af", "#241e4b"] } },
+      { "base": "#1d1634", "accent": "#bb9ae5", "glow": { "at": [0.8, 0.7], "colors": ["#d7c5f0", "#6b438c", "#281a40"] } },
+      { "base": "#17182e", "accent": "#9fa9f0", "glow": { "at": [0.15, 0.8], "colors": ["#d4dcff", "#4f5d9f", "#202748"] } }
+    ]
+  },
+  "subject": { "kind": "glass-lattice", "items": 48, "seed": 8011, "params": { "radius": 0.2, "dust": 1800 } },
+  "interaction": { "title": "A score near your cursor", "groups": ["Chamber", "Hall", "Studio"], "names": ["chamber", "hall", "studio"], "scanLabel": "sample notes / scan" },
+  "chapters": [
+    { "id": "listen", "archetype": "hero", "nav": "Listen", "target": { "layout": "ring" },
+      "copy": { "title": "Room for", "em": "resonance.", "deck": "A fictional library of scores for the spaces between notes.", "ctas": [{ "label": "Explore the score", "href": "#layers" }] } },
+    { "id": "interval", "archetype": "band", "copy": { "line": "Silence has\na shape.", "caption": "Plate I / a procedural score for an empty room" }, "params": { "heightSvh": 110, "lineCount": 28 } },
+    { "id": "layers", "archetype": "explainer", "nav": "Layers", "target": { "layout": "layers", "k": 3 }, "place": { "desktop": "right", "scale": 0.85 },
+      "copy": { "title": "Hear the room.", "deck": "Choose a layer in this illustrative score. The ring stays whole as the camera changes its view.",
+        "layers": [{ "label": "Attack", "detail": "The first gesture" }, { "label": "Body", "detail": "A sustained centre" }, { "label": "Decay", "detail": "The remaining trace" }],
+        "slider": { "label": "Sustain", "min": 0, "max": 100, "value": 45 },
+        "numerals": [{ "label": "Sample duration", "base": 2, "span": 8, "curve": "lin", "decimals": 1, "suffix": "s" }],
+        "fine": "All readings are invented for this study." } },
+    { "id": "duration", "archetype": "stat", "target": { "layout": "ring" }, "place": { "desktop": "right", "mobile": "top", "scale": 0.3 }, "copy": { "title": "Time left to resonate", "giant": "08", "deck": "Eight imagined seconds between the first gesture and the last trace.", "steps": [2,4,8], "stepLabel": "Sample layers", "numerals": [{ "label": "Seconds / sample model", "mode": "linear", "base": 8, "per": 0 }], "fine": "Illustrative score. No audio is played." } },
+    { "id": "afterimage", "archetype": "band", "copy": { "line": "The note ends.\nThe room remains.", "caption": "Plate II / the remaining trace" }, "params": { "heightSvh": 110, "lineCount": 40 } },
+    { "id": "questions", "archetype": "faq", "nav": "Questions", "target": { "layout": "sphere" }, "place": { "desktop": "left", "scale": 0.8 }, "copy": { "title": "A little context." } }
+  ],
+  "commerce": {
+    "faq": [
+      { "q": "Can I listen to these scores?", "a": "This visual study contains no audio. The archive and readings are fictional." },
+      { "q": "Why does the ring stay intact?", "a": "The orbit grammar explores one coherent form with a moving camera." },
+      { "q": "Does motion have an alternative?", "a": "Reduced motion keeps an assembled still. Without WebGL, the typography and controls remain available." }
+    ]
+  }
+}

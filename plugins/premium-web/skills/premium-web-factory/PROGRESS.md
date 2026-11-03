@@ -1,5 +1,55 @@
 # Factory page grammars
 
+## Job 2 checkpoints
+
+1. Terminal: independent window-first renderer and runtime added. Scroll selects a
+   command chapter; a monotonic clock reveals one character per 35ms, then outputs
+   its block instantly. Split diagram/log panes, 260ms scanline glitch, live clock,
+   mobile stack and static reduced-motion frames are implemented. Render pending.
+2. Collage: independent type-first renderer and bounded damped pointer/scroll
+   controller added. Alternating type weights, flat cutouts, SVG paper plate,
+   marquee, focus/hover/tap captions and mobile scroll reflow. Render pending.
+3. Proof enrichment: stack and bleed each have six authored sections including
+   two full-bleed drawn plates. Rail retains six content chapters with a paper
+   commerce ground and staggered pricing rows. Terminal/collage have six chapters
+   each; fictional specs created. Before renders preserved in .verify-before.
+   Initial after-render: rail passes all hard gates but still has templaty tells;
+   adding an illustrated full-width interlude. Baseline bleed had a mobile pricing
+   collision; its variant mobile subject scale is now .72 (desktop stays 1.2).
+4. Schema/loader/generator accept terminal and collage with isolated runtime file
+   sets, shared commerce dependencies, cross-grammar rejection and palette-index
+   checks. Eight new executable selftest cases pass, including controller mocks for
+   actual typing, backwards scroll, bounded pointer, tap, mobile and reduced motion.
+5. Documentation stays below 200 lines; factory skill below 110. Four new routing evals
+   (two per grammar) use the existing case/prompt/regex-grader format under this
+   skill's evals directory to respect edit scope. Model-based evals not run.
+   Added a factory-local portfolio adapter: terminal has command/figure order;
+   all five source specs pass with no structural siblings. The sibling gate alone
+   cannot read terminal sessions; no files outside this skill were changed.
+6. Final remote renders at 1440 and 390: rail, stack, bleed, terminal and collage
+   all PASS with zero hard failures, no horizontal overflow, no void warnings and
+   no craft failures. Latest reports are each piece/.verify/report.json. Iterations
+   after baseline: rail 2, stack 3, bleed 1, terminal 2, collage 3.
+   Tells: rail equal_card_grids/palette (2); stack none; bleed none; terminal
+   caps_micro_labels/mono_body/mono_panels (3, expected console idiom); collage
+   caps_micro_labels (1). None are classified templaty. Existing demos retain
+   24–44px tap warnings; live visuals/clock/marquee have settling warnings.
+   Looked at desktop and mobile section PNGs: console log/diagram separation,
+   paper collage with the corrected outlined MARK, full-bleed contour plates,
+   rail paper commerce, cleared mobile coil/pricing and cleared stat/ring caption.
+   Stack and bleed have six authored sections; rail has four horizontal panels,
+   drawn interlude and two commerce sections. New demos each have six chapters.
+   Passed factory selftest, five-piece variation gate, 170 JS/MJS syntax checks,
+   authored-code 800-line limit and git diff --check. Legacy byte golden passes.
+   No browser launched. Final fonts, full interactive browser sweeps and model
+   routing evals remain unverified; controller behavior is covered by mocks.
+   Screenshot attachment is blocked: no ticket id was supplied and tickets.py
+   is absent from PATH/worktree. Asked for both; no answer received yet. Before
+   shots remain in each original demo's piece/.verify-before/sections/; after
+   shots in piece/.verify/sections/. No screenshot/font/image assets are tracked.
+
+## Job 1 handoff
+
 1. Grammar contract: schema and loader accept `morph-subject` (default) and `rail`;
    legacy normalization keeps omitted grammar out of serialized output. Baseline example
    generated at `/private/tmp/pw-factory-legacy-before` for byte comparison. Original selftest passed.

@@ -1,0 +1,22 @@
+{
+  "name":"Ferrule",
+  "grammar":"terminal",
+  "concept":{"notice":"Fictional field instrument / simulated readings","noticeShort":"Fictional instrument","description":"An invented field instrument records a six-command expedition, from calibration to archive. All readings are simulated."},
+  "direction":{
+    "palette":{"ground":"#132525","ink":"#eff6e6","inkSoft":"#b5cdc5","accent":"#9adbc4"},
+    "fonts":{"display":{"id":"ibm-plex-sans","family":"IBM Plex Sans","weight":600},"body":{"id":"ibm-plex-mono","family":"IBM Plex Mono","fallback":"monospace"}},
+    "ground":[{"base":"#132525","glow":{"colors":["#9adbc4","#315d50","#132525"]}}]
+  },
+  "terminal":{
+    "prompt":"field@ferrule:~$",
+    "theme":{"screen":"#0c1819","text":"#e5efdc","signal":"#a4efba"},
+    "session":[
+      {"id":"wake","title":"A signal worth following.","nav":"Wake","cmd":"ferrule wake --site estuary","output":["FERRULE FIELD OS / SIMULATION 0.8","Opening local notebook…","Site: estuary / tide: incoming","6 instruments found. No network required.","READY: begin a new observation."],"pane":{"kind":"quote-free","value":"Local first. Field ready.","label":"Plate 01 / instrument reticle, drawn in SVG"}},
+      {"id":"calibrate","title":"Start with a known point.","nav":"Calibrate","cmd":"sensor calibrate --reference dry","output":["[01] zero reference    OK","[02] thermal baseline OK","[03] drift correction OK","Offset stored locally.","No measurements have left this device."],"pane":{"kind":"timeline","items":["Zero reference","Set baseline","Correct drift","Lock calibration"],"label":"Calibration protocol / illustrative workflow"}},
+      {"id":"sample","title":"Small readings. Long view.","cmd":"sample collect --window 24h","output":["Collecting illustrative observations…","Window  24 hours","Samples 144 accepted / 0 rejected","Median  18.4 °C","Range   16.1–21.8 °C","Sample set saved: estuary-001"],"pane":{"kind":"stat","value":"144","label":"Simulated observations / one day"}},
+      {"id":"trace","title":"Keep the path visible.","nav":"Trace","cmd":"trace route --from reedbed","output":["SOURCE    reedbed / local sensor","TRANSFER  notebook / checksum matched","ARCHIVE   shelf-01 / read-only copy","3 stops. One continuous chain.","Provenance attached to every observation."],"pane":{"kind":"diagram","items":["Reedbed","Notebook","Shelf 01"],"label":"Observation provenance / three labelled stops"}},
+      {"id":"review","title":"Leave room for doubt.","cmd":"review flag --variance high","output":["Review queue: 2 observations","12:40  wind shadow / add field note","17:10  tide shift / retain raw sample","No automatic deletion.","A question is part of the record."],"pane":{"kind":"stat","value":"02","label":"Illustrative readings awaiting human review"}},
+      {"id":"archive","title":"Close the notebook.","nav":"Archive","cmd":"archive seal --edition first","output":["Writing field notes…","Manifest checksum: matched","Raw samples: preserved","Edition first: SEALED","Session complete. Return when the tide turns."],"pane":{"kind":"quote-free","value":"The field keeps its own time.","label":"Plate 06 / sealed local edition"}}
+    ]
+  }
+}

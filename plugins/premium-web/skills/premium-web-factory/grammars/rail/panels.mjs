@@ -16,7 +16,7 @@ export function ambient(count) {
   return `<svg class="rail-ambient" viewBox="0 0 ${SVG.width} ${SVG.height}" preserveAspectRatio="none" aria-hidden="true"><g data-contours>${paths.join('')}</g></svg>`;
 }
 
-function graphic(figure) {
+export function graphic(figure) {
   const f = figure;
   if (f.kind === 'stat') return `<p class="rail-stat">${esc(f.value)}</p>`;
   if (f.kind === 'timeline') return `<ol class="rail-timeline">${f.items.map((item, i) => `<li><span class="mono">${ordinal(i)}</span><p>${esc(item)}</p></li>`).join('')}</ol>`;
@@ -31,7 +31,7 @@ function graphic(figure) {
 }
 
 function kinetic(title) {
-  return title.split(/\s+/).map((word) => `<span class="kinetic-word">${[...word].map((letter) => `<span data-letter aria-hidden="true">${esc(letter)}</span>`).join('')}</span>`).join(' ');
+  return title.split(/\s+/).map((word) => `<span class="kinetic-word" data-letter aria-hidden="true">${esc(word)}</span>`).join(' ');
 }
 
 export function renderPanels(piece) {

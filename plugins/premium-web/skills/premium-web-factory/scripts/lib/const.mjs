@@ -27,3 +27,5 @@ export const SCROLL_DEFAULTS = { mode: 'morph' };
 export const READOUT_DEFAULT = 'card';
 export const RAIL_DEFAULTS = { damping: 0.12, panelVw: 100, scrollRatio: 1, velocityMax: 1.2, ambientLines: 12, transition: 'scale' };
 export const MORPH_MIN_CHAPTERS = 3;
+export const GRAMMAR_TERMINAL = 'terminal', GRAMMAR_COLLAGE = 'collage';
+export const CODE_GRAMMARS = [GRAMMAR_RAIL, GRAMMAR_TERMINAL, GRAMMAR_COLLAGE];

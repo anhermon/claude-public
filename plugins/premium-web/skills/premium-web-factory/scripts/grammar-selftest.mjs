@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { generate, buildFiles } from './new-piece.mjs';
 import { loadSpec } from './lib/spec.mjs';
+import { codeOnlySelftest } from './code-only-selftest.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PROOFS = path.join(ROOT, '.proofs'), RUNTIME = path.join(ROOT, 'runtime');
@@ -133,6 +134,7 @@ function mockSubject(piece) {
 }
 
 export async function grammarSelftest(tmp, check) {
+  await codeOnlySelftest(tmp, check);
   async function test(label, fn) {
     try { await fn(); check(label, true); } catch (error) { check(label, false, error.message); }
   }

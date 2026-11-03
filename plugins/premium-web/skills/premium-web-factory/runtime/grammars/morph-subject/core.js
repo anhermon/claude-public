@@ -11,6 +11,7 @@ const HERO_PLACES = {
 };
 const TYPE_AT = [0.65, -0.64], STACK_AT = [0, -0.55];
 const STATIC_TIME = 0, STATIC_POINTER = { x: 0, y: 0, moved: false };
+const MOBILE_BLEED_SCALE = .72;
 
 export function createCore({ piece, mobile, N }) {
   const mode = piece.scroll?.mode || 'morph', layout = piece.hero?.layout || 'split';
@@ -18,8 +19,9 @@ export function createCore({ piece, mobile, N }) {
   const composed = { ...piece, chapters: piece.chapters.map((c) => {
     if (!c.hasTarget) return c;
     const heroPlace = c === first ? HERO_PLACES[layout] : null;
-    return { ...c, target: SHAPE_FIXED.has(mode) ? first.target : c.target,
-      place: mode === 'static' ? { ...first.place, ...HERO_PLACES[layout] } : { ...c.place, ...heroPlace } };
+    const place = mode === 'static' ? { ...first.place, ...HERO_PLACES[layout] } : { ...c.place, ...heroPlace };
+    if (mobile && layout === 'bleed') place.scale = MOBILE_BLEED_SCALE;
+    return { ...c, target: SHAPE_FIXED.has(mode) ? first.target : c.target, place };
   }) };
   const core = originalCore({ piece: composed, mobile, N });
   if (SHAPE_FIXED.has(mode)) core.forms.fill(core.forms[0]);

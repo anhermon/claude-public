@@ -4,10 +4,17 @@
   "description": "One declarative file per piece. new-piece.mjs validates it against this schema (subset: type, enum, required, properties, items, min/max, pattern), then emits a runnable page. Decisions only; no code, no long copy beyond what a section shows.",
   "type": "object",
   "required": ["name", "concept", "direction"],
-  "allOf": [{ "if": { "required": ["grammar"], "properties": { "grammar": { "const": "rail" } } }, "then": { "required": ["rail"] }, "else": { "required": ["subject", "chapters"] } }],
+  "allOf": [
+    { "if": { "required": ["grammar"], "properties": { "grammar": { "const": "rail" } } }, "then": { "required": ["rail"] } },
+    { "if": { "required": ["grammar"], "properties": { "grammar": { "const": "terminal" } } }, "then": { "required": ["terminal"] } },
+    { "if": { "required": ["grammar"], "properties": { "grammar": { "const": "collage" } } }, "then": { "required": ["collage", "chapters"] } },
+    { "if": { "required": ["grammar"], "properties": { "grammar": { "enum": ["rail", "terminal", "collage"] } } }, "else": { "required": ["subject", "chapters"] } }
+  ],
   "additionalProperties": false,
   "properties": {
-    "grammar": { "type": "string", "enum": ["morph-subject", "rail"], "default": "morph-subject" },
+    "grammar": { "type": "string", "enum": ["morph-subject", "rail", "terminal", "collage"], "default": "morph-subject" },
+    "terminal": { "$ref": "#/$defs/terminal" },
+    "collage": { "$ref": "#/$defs/collage" },
     "hero": { "type": "object", "additionalProperties": false, "properties": {
       "layout": { "type": "string", "enum": ["split", "stack", "bleed", "type-only"], "default": "split" },
       "wordmark": { "type": "boolean", "default": true }
@@ -120,7 +127,7 @@
         "additionalProperties": false,
         "properties": {
           "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "archetype": { "type": "string", "enum": ["hero", "claim", "explainer", "band", "stat", "ship", "pricing", "faq", "footer"] },
+          "archetype": { "type": "string", "enum": ["hero", "claim", "explainer", "band", "stat", "ship", "pricing", "faq", "footer", "collage"] },
           "nav": { "type": "string", "description": "Label in the top nav. Omit to keep the chapter out of the nav." },
           "target": {
             "type": "object",
@@ -211,6 +218,38 @@
     }
   },
   "$defs": {
+    "terminal": { "type": "object", "required": ["prompt", "theme", "session"], "additionalProperties": false, "properties": {
+      "prompt": { "type": "string", "minLength": 1 },
+      "theme": { "type": "object", "required": ["screen", "text", "signal"], "additionalProperties": false, "properties": {
+        "screen": { "$ref": "#/$defs/color" }, "text": { "$ref": "#/$defs/color" }, "signal": { "$ref": "#/$defs/color" }
+      } },
+      "session": { "type": "array", "minItems": 2, "maxItems": 8, "items": {
+        "type": "object", "required": ["id", "title", "cmd", "output", "pane"], "additionalProperties": false, "properties": {
+          "id": { "$ref": "#/$defs/id" }, "title": { "type": "string", "minLength": 1 }, "nav": { "type": "string" },
+          "cmd": { "type": "string", "minLength": 1 },
+          "output": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "type": "string" } },
+          "pane": { "$ref": "#/$defs/figure" }
+        }
+      } }
+    } },
+    "collage": { "type": "object", "required": ["words", "blocks", "palette"], "additionalProperties": false, "properties": {
+      "words": { "type": "array", "minItems": 2, "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 12 } },
+      "palette": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "$ref": "#/$defs/color" } },
+      "blocks": { "type": "array", "minItems": 1, "maxItems": 8, "items": {
+        "type": "object", "required": ["label", "caption", "color"], "additionalProperties": false, "properties": {
+          "label": { "type": "string" }, "caption": { "type": "string" },
+          "color": { "type": "integer", "minimum": 0, "maximum": 5 }
+        }
+      } },
+      "marquee": { "type": "string" }
+    } },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "figure": { "type": "object", "required": ["kind", "label"], "additionalProperties": false, "properties": {
+      "kind": { "type": "string", "enum": ["stat", "timeline", "diagram", "quote-free"] },
+      "label": { "type": "string" }, "value": { "type": "string" },
+      "items": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } }
+    } },
     "rail": { "type": "object", "required": ["panels"], "additionalProperties": false, "properties": {
       "panels": { "type": "array", "minItems": 2, "maxItems": 8, "items": {
         "type": "object", "required": ["id", "title", "copy", "figure"], "additionalProperties": false, "properties": {
