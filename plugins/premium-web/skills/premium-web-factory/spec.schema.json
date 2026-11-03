@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "premium-web-factory piece spec",
+  "description": "One declarative file per piece. new-piece.mjs validates it against this schema (subset: type, enum, required, properties, items, min/max, pattern), then emits a runnable page. Decisions only; no code, no long copy beyond what a section shows.",
+  "type": "object",
+  "required": ["name", "concept", "direction", "subject", "chapters"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 2, "description": "Product or piece name. Also the giant wordmark (upper-cased) and the loader wordmark." },
+    "slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Optional. Defaults to the lower-cased name." },
+    "lang": { "type": "string", "default": "en" },
+    "concept": {
+      "type": "object",
+      "required": ["notice", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "notice": { "type": "string", "description": "Shown in the nav as a tag and in the footer. Invented concepts MUST say so (fictional, sample data)." },
+        "noticeShort": { "type": "string", "description": "Nav tag text on narrow screens. Defaults to the first three words of notice." },
+        "description": { "type": "string", "description": "meta description / og:description." }
+      }
+    },
+    "direction": {
+      "type": "object",
+      "required": ["palette", "fonts", "ground"],
+      "additionalProperties": false,
+      "properties": {
+        "palette": {
+          "type": "object",
+          "required": ["ground", "ink", "inkSoft", "accent"],
+          "additionalProperties": false,
+          "properties": {
+            "ground": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "ink": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "inkSoft": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+            "accentText": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "description": "Accent used for text on the dark ground. Defaults to accent." },
+            "light": {
+              "type": "object",
+              "description": "Tokens used while a pale ground is active (ground[].light = true).",
+              "additionalProperties": false,
+              "properties": {
+                "ground": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+                "ink": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+                "inkSoft": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+                "accentText": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
+              }
+            }
+          }
+        },
+        "fonts": {
+          "type": "object",
+          "required": ["display", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "display": { "$ref": "#/$defs/font" },
+            "body": { "$ref": "#/$defs/font" },
+            "mono": { "$ref": "#/$defs/font" }
+          }
+        },
+        "ground": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Ground sequence: one entry per chapter that has a target (act), in order. Missing entries repeat the last one. Tweened 0.7 s on chapter change.",
+          "items": {
+            "type": "object",
+            "required": ["base", "glow"],
+            "additionalProperties": false,
+            "properties": {
+              "base": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "accent": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+              "glow": {
+                "type": "object",
+                "required": ["colors"],
+                "additionalProperties": false,
+                "properties": {
+                  "at": { "type": "array", "description": "Glow centre [x, y] in 0..1 of the viewport. Default [0.5, 1.0]." },
+                  "radius": { "type": "array", "description": "[rx, ry] in viewport fractions. Default [0.9, 0.6]." },
+                  "colors": { "type": "array", "minItems": 3, "maxItems": 3, "description": "Bright core, mid, deep edge. On a light ground use pale tints." }
+                }
+              },
+              "light": { "type": "boolean", "description": "true = pale ground: ink tokens switch to palette.light and glass objects get less halo." }
+            }
+          }
+        }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "description": "The ONE persistent subject. Same items re-arranged by chapter targets; never a second subject.",
+      "properties": {
+        "kind": { "type": "string", "enum": ["glass-lattice", "point-cloud", "shader-field", "custom-module"] },
+        "items": { "type": "integer", "minimum": 8, "maximum": 256, "description": "Queryable items (nodes / anchor points / attractors). Default 96 (glass), 64 (point-cloud), 24 (shader-field)." },
+        "count": { "type": "integer", "minimum": 1000, "maximum": 60000, "description": "point-cloud only: rendered points on desktop (mobile gets a third)." },
+        "seed": { "type": "integer" },
+        "params": { "type": "object", "description": "Per-kind generator parameters; see references/archetypes.md#subjects. Unknown keys are rejected." },
+        "wordmark": { "type": "boolean", "description": "Render the giant wordmark behind/through the subject in the hero. Default true." },
+        "module": { "type": "string", "description": "custom-module only: path (relative to the piece) of an ES module exporting createSubject(cfg, env)." },
+        "fallback": { "type": "string", "enum": ["gradient"], "description": "Poster when WebGL is off. Only a procedural gradient is generated; there is no stored image." }
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["id", "archetype"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "archetype": { "type": "string", "enum": ["hero", "claim", "explainer", "band", "stat", "ship", "pricing", "faq", "footer"] },
+          "nav": { "type": "string", "description": "Label in the top nav. Omit to keep the chapter out of the nav." },
+          "target": {
+            "type": "object",
+            "description": "Morph target of the subject for this chapter. Omit on band/footer (subject holds the previous form).",
+            "required": ["layout"],
+            "additionalProperties": false,
+            "properties": {
+              "layout": { "type": "string", "enum": ["cube", "sphere", "ring", "helix", "layers", "clusters", "towers", "shards", "wave", "galaxy", "scatter", "plane"] },
+              "k": { "type": "integer", "minimum": 2, "maximum": 12, "description": "Group count for layers / clusters / towers / shards." },
+              "params": { "type": "object" }
+            }
+          },
+          "place": {
+            "type": "object",
+            "additionalProperties": false,
+            "description": "Where the subject sits while this chapter is active. Copy goes to the opposite side. Mobile is composed separately.",
+            "properties": {
+              "desktop": { "type": "string", "enum": ["left", "right", "center", "top", "bottom"] },
+              "mobile": { "type": "string", "enum": ["top", "center", "bottom"] },
+              "scale": { "type": "number", "minimum": 0.3, "maximum": 1.4 },
+              "pitch": { "type": "number" },
+              "yaw": { "type": "number" }
+            }
+          },
+          "copy": { "type": "object", "description": "Archetype-specific copy; required keys per archetype are in references/archetypes.md." },
+          "params": { "type": "object", "description": "Archetype-specific parameters; defaults in each archetypes/<id>.mjs `meta.params`." }
+        }
+      }
+    },
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The pointer query: the cursor runs a real nearest-item search; the readout prints the result.",
+      "properties": {
+        "title": { "type": "string" },
+        "unit": { "type": "string", "description": "Printed after distances, e.g. 'units'." },
+        "names": { "type": "array", "description": "Item name stems; item i is named stem[group]-NNN. Default: item-NNN." },
+        "groups": { "type": "array", "description": "Group (topic) labels; also the chips of the claim archetype." },
+        "scanLabel": { "type": "string", "description": "Readout footer, e.g. 'items scanned in'." },
+        "footnote": { "type": "string" }
+      }
+    },
+    "commerce": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "currency": { "type": "string", "default": "$" },
+        "inputs": {
+          "type": "array", "minItems": 1, "maxItems": 2,
+          "description": "Calculator sliders (usage dimensions). Ids must be 'a' and 'b'.",
+          "items": { "type": "object", "required": ["id", "label", "min", "max", "value"], "additionalProperties": false,
+            "properties": { "id": { "type": "string", "enum": ["a", "b"] }, "label": { "type": "string" }, "unit": { "type": "string" }, "min": { "type": "number" }, "max": { "type": "number" }, "step": { "type": "number" }, "value": { "type": "number" }, "suffix": { "type": "string", "description": "Printed after the value, e.g. 'M'." } } }
+        },
+        "tiers": {
+          "type": "array", "minItems": 2, "maxItems": 4,
+          "items": { "type": "object", "required": ["name", "fixed"], "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "fixed": { "type": "number", "description": "Monthly base price." },
+              "included": { "type": "object", "description": "{a, b}: units included before rates apply." },
+              "rates": { "type": "object", "description": "{a, b}: price per unit above included." },
+              "cap": { "type": "object", "description": "{a, b}: hard limit; the tier is marked 'over limit' above it." },
+              "bullets": { "type": "array", "items": { "type": "string" } }
+            } }
+        },
+        "faq": { "type": "array", "minItems": 3, "maxItems": 12, "items": { "type": "object", "required": ["q", "a"], "additionalProperties": false, "properties": { "q": { "type": "string" }, "a": { "type": "string" } } } },
+        "cta": { "type": "object", "required": ["title", "label"], "additionalProperties": false, "properties": { "title": { "type": "string" }, "body": { "type": "string" }, "label": { "type": "string" }, "href": { "type": "string" } } }
+      }
+    },
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Plan only. The plugin stores no images: 'code' = procedural SVG/CSS emitted by the generator; 'procedural' = same, subject-driven; 'generated-with-prompt' = produced later by premium-web-imagery into the asset cache and copied in by package-piece.mjs.",
+      "properties": {
+        "plan": { "type": "array", "items": { "type": "object", "required": ["slot", "source"], "additionalProperties": false,
+          "properties": { "slot": { "type": "string", "enum": ["band", "cta", "og"] }, "source": { "type": "string", "enum": ["code", "procedural", "generated-with-prompt"] }, "prompt": { "type": "string" }, "alt": { "type": "string" }, "file": { "type": "string", "description": "Path under img/ of the generated file. Used only if it exists at generation time." } } } }
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dprMax": { "type": "number", "minimum": 1, "maximum": 3 },
+        "dprMaxMobile": { "type": "number", "minimum": 1, "maximum": 2 },
+        "frameMs": { "type": "number", "minimum": 8, "maximum": 50, "description": "Governor threshold: median frame above this degrades quality." },
+        "mobileMaxWidth": { "type": "integer", "minimum": 320, "maximum": 1024 }
+      }
+    }
+  },
+  "$defs": {
+    "font": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Fontsource id as accepted by premium-web/scripts/get-font.sh (open licences only)." },
+        "family": { "type": "string", "description": "CSS family name; defaults to the title-cased id." },
+        "weight": { "type": "integer", "minimum": 100, "maximum": 900, "description": "Display headline weight (display font) or base weight." },
+        "stretch": { "type": "integer", "description": "font-stretch percent for variable fonts with a width axis." },
+        "fallback": { "type": "string", "description": "Generic family after the web font. Default sans-serif / serif / monospace." }
+      }
+    }
+  }
+}

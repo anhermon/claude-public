@@ -1,7 +1,7 @@
 {
   "name": "premium-web",
-  "version": "2.0.0",
-  "description": "Build premium web pages that do not look AI-generated: a spec-before-code process, a causal model of why generated sites look generic, a render-and-look loop with an independent critic, and sub-skills for motion, WebGL, SVG and generated imagery.",
+  "version": "2.1.0",
+  "description": "Build premium web pages that do not look AI-generated: a spec-before-code process, a causal model of why generated sites look generic, a render-and-look loop with an independent critic, and sub-skills for motion, WebGL, SVG and generated imagery, plus a deterministic spec-to-page factory for a fast strong baseline.",
   "author": {
     "name": "Angel Hermon"
   },
@@ -14,6 +14,7 @@
     "motion",
     "webgl",
     "svg",
-    "imagery"
+    "imagery",
+    "generator"
   ]
 }

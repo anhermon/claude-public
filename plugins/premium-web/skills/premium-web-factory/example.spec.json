@@ -1,0 +1,95 @@
+{
+  "name": "Tidewell",
+  "slug": "tidewell",
+  "concept": {
+    "notice": "Concept / fictional, sample data",
+    "noticeShort": "Concept, sample data",
+    "description": "Tidewell is a fictional coastal sensor-data API: a concept page with sample data. One glass lattice that answers your cursor, then morphs through query, index, scale, ship and pricing."
+  },
+  "direction": {
+    "palette": { "ground": "#03100f", "ink": "#ecf7f4", "inkSoft": "#9db8b2", "accent": "#5ee0c3", "accentText": "#5ee0c3",
+      "light": { "ground": "#d4e6e2", "ink": "#0a1816", "inkSoft": "#3b5652", "accentText": "#0b6f60" } },
+    "fonts": {
+      "display": { "id": "archivo", "family": "Archivo", "weight": 300, "stretch": 112 },
+      "body": { "id": "archivo", "family": "Archivo", "weight": 400 },
+      "mono": { "id": "martian-mono", "family": "Martian Mono" }
+    },
+    "ground": [
+      { "base": "#03100f", "accent": "#5ee0c3", "glow": { "at": [0.72, 1.05], "radius": [0.9, 0.62], "colors": ["#d9fff5", "#1fb69a", "#06383a"] } },
+      { "base": "#03100f", "accent": "#5ee0c3", "glow": { "at": [0.1, 0.95], "radius": [0.8, 0.7], "colors": ["#c8f5ee", "#16a08f", "#06322f"] } },
+      { "base": "#040a14", "accent": "#8fb6ff", "glow": { "at": [0.78, 0.9], "radius": [0.85, 0.7], "colors": ["#cfe3ff", "#3c78d8", "#0c2a5a"] } },
+      { "base": "#03100f", "accent": "#5ee0c3", "glow": { "at": [0.5, 1.1], "radius": [1.0, 0.5], "colors": ["#bfeee4", "#188f86", "#052c2c"] } },
+      { "base": "#d4e6e2", "accent": "#0b6f60", "light": true, "glow": { "at": [0.72, 0.45], "radius": [0.75, 0.8], "colors": ["#ffffff", "#eef7f5", "#d4e6e2"] } },
+      { "base": "#03100f", "accent": "#5ee0c3", "glow": { "at": [0.7, 1.0], "radius": [0.9, 0.6], "colors": ["#e8fff9", "#3fd0b5", "#073d3c"] } },
+      { "base": "#03100f", "accent": "#5ee0c3", "glow": { "at": [0.75, 1.1], "radius": [0.9, 0.55], "colors": ["#a8e8dc", "#1a7d73", "#05242a"] } }
+    ]
+  },
+  "subject": { "kind": "glass-lattice", "items": 96, "seed": 7001, "wordmark": true, "params": {} },
+  "interaction": {
+    "title": "Nearest to your cursor",
+    "unit": "u",
+    "groups": ["Harbour", "Estuary", "Offshore", "Reef", "Delta", "Fjord"],
+    "names": ["harbour-gauge", "estuary-buoy", "offshore-array", "reef-probe", "delta-station", "fjord-mooring"],
+    "scanLabel": "items scanned in",
+    "footnote": "Sample stations. Not a benchmark."
+  },
+  "chapters": [
+    { "id": "top", "archetype": "hero", "target": { "layout": "cube" }, "place": { "desktop": "right", "mobile": "top", "scale": 1.0, "pitch": 0.16, "yaw": 0.55 },
+      "copy": { "title": "Read the whole coast", "em": "in one query.", "deck": "Tidewell stores every gauge, buoy and mooring as a point in one space you can ask about. Move your cursor over it. That is a query.",
+        "ctas": [{ "label": "Run a query", "href": "#query", "kind": "primary" }, { "label": "See the API", "href": "#ship", "kind": "link" }] } },
+    { "id": "query", "archetype": "claim", "nav": "Query", "target": { "layout": "clusters", "k": 6 }, "place": { "desktop": "left", "mobile": "top", "scale": 0.9, "pitch": 0.12, "yaw": 0.25 },
+      "copy": { "title": "Ask by place,", "em": "not by id.", "deck": "Every station becomes a point and a question becomes a point too. The answer is whoever sits nearest. Filter by water body to narrow the field." },
+      "params": { "rows": 5 } },
+    { "id": "index", "archetype": "explainer", "nav": "Index", "target": { "layout": "layers", "k": 4 }, "place": { "desktop": "right", "mobile": "top", "scale": 0.95, "pitch": 0.42, "yaw": -0.3 },
+      "copy": { "title": "Four layers,", "em": "one short walk.", "deck": "Stations are linked into layers of proximity. A search enters at the sparse top layer and walks down, visiting only a sliver of the data. One knob trades recall for latency.",
+        "layers": [{ "label": "Region", "detail": "a handful of anchors" }, { "label": "Coast", "detail": "a few per basin" }, { "label": "Station", "detail": "every gauge" }, { "label": "Reading", "detail": "dense, local" }],
+        "slider": { "label": "search width", "min": 1, "max": 100, "value": 46, "suffix": "" },
+        "numerals": [{ "label": "recall@10", "base": 0.4, "span": 0.59, "curve": "sat", "decimals": 2 }, { "label": "p99 latency", "base": 1.1, "span": 8.5, "curve": "lin", "decimals": 1, "suffix": " ms" }, { "label": "stations visited", "base": 4, "span": 60, "curve": "lin", "decimals": 0 }],
+        "fine": "Sample curve on sample stations. Not measured." } },
+    { "id": "band", "archetype": "band", "copy": { "line": "A coast has a shape.\nTidewell keeps it.", "caption": "Illustration slot, procedural placeholder" }, "params": { "slot": "band" } },
+    { "id": "scale", "archetype": "stat", "nav": "Scale", "target": { "layout": "shards", "k": 8 }, "place": { "desktop": "bottom", "mobile": "top", "scale": 0.8, "pitch": 0.5, "yaw": 0.2 },
+      "copy": { "title": "From one harbour to a whole ocean", "giant": "480M", "deck": "sample readings a day, sharded. A query fans out, each shard answers with its own top ten, a merge keeps the best.",
+        "steps": [1, 2, 4, 8], "stepLabel": "shards",
+        "numerals": [{ "label": "readings per shard", "mode": "divide", "total": 480000000, "decimals": 0 }, { "label": "slowest shard", "mode": "log", "base": 8, "per": 1.4, "suffix": " ms", "decimals": 0 }, { "label": "merge", "mode": "linear", "base": 0.4, "per": 0.35, "suffix": " ms", "decimals": 1 }, { "label": "end to end", "mode": "log", "base": 9, "per": 2.1, "suffix": " ms", "decimals": 0 }],
+        "fine": "A simple timing model on sample data. Not a measurement." } },
+    { "id": "ship", "archetype": "ship", "nav": "Ship", "target": { "layout": "helix" }, "place": { "desktop": "right", "mobile": "top", "scale": 1.0, "pitch": 0.18, "yaw": 0.7 },
+      "copy": { "title": "Three lines", "em": "to ship.", "deck": "Send a place, get the nearest stations back. Fictional API, sample key.",
+        "tabs": [
+          { "id": "py", "label": "Python", "code": "from tidewell import Client\ndb = Client(api_key=\"tw_sample_key\")\nhits = db.near(\"harbour mouth at dusk\", top_k=3)" },
+          { "id": "ts", "label": "TypeScript", "code": "import { Tidewell } from \"tidewell\";\nconst db = new Tidewell({ apiKey: \"tw_sample_key\" });\nconst hits = await db.near(\"harbour mouth at dusk\", { topK: 3 });" },
+          { "id": "curl", "label": "curl", "code": "curl https://api.tidewell.example/v1/near \\\n  -H \"Authorization: Bearer tw_sample_key\" \\\n  -d '{\"q\":\"harbour mouth at dusk\",\"top_k\":3}'" }
+        ],
+        "response": [{ "name": "harbour-gauge-212", "score": "0.12" }, { "name": "estuary-buoy-417", "score": "0.14" }, { "name": "delta-station-908", "score": "0.15" }] } },
+    { "id": "pricing", "archetype": "pricing", "nav": "Pricing", "target": { "layout": "towers", "k": 3 }, "place": { "desktop": "right", "mobile": "top", "scale": 0.95, "pitch": 0.14, "yaw": 0.0 },
+      "copy": { "title": "Priced by what", "em": "you read.", "deck": "Move the sliders. Every tier is priced live, and the cheapest one that fits lights up in the lattice.", "fine": "Invented prices for the concept. The arithmetic is shown." } },
+    { "id": "faq", "archetype": "faq", "nav": "FAQ", "target": { "layout": "sphere" }, "place": { "desktop": "right", "mobile": "top", "scale": 0.8, "pitch": 0.2, "yaw": 0.4 },
+      "copy": { "title": "Questions,", "em": "answered." } },
+    { "id": "foot", "archetype": "footer", "copy": {} }
+  ],
+  "commerce": {
+    "currency": "$",
+    "inputs": [
+      { "id": "a", "label": "readings a month", "min": 0, "max": 100, "step": 1, "value": 12, "suffix": "M" },
+      { "id": "b", "label": "stations stored", "min": 0, "max": 60, "step": 1, "value": 8, "suffix": "k" }
+    ],
+    "tiers": [
+      { "name": "Prototype", "fixed": 0, "included": { "a": 1, "b": 1 }, "rates": { "a": 0, "b": 0 }, "cap": { "a": 1, "b": 1 }, "bullets": ["1M readings a month", "1k stations", "One index"] },
+      { "name": "Team", "fixed": 29, "included": { "a": 5, "b": 5 }, "rates": { "a": 0.5, "b": 3 }, "cap": { "a": 100, "b": 40 }, "bullets": ["$0.50 per 1M readings above 5M", "$3 per 1k stations above 5k", "Metadata filters"] },
+      { "name": "Dedicated", "fixed": 500, "included": { "a": 100, "b": 60 }, "rates": { "a": 0.2, "b": 1 }, "bullets": ["Reserved shards", "Region pinning", "Named contact"] }
+    ],
+    "faq": [
+      { "q": "Is Tidewell real?", "a": "No. It is a fictional product and this is a concept page. Every number is sample data, labelled where it appears." },
+      { "q": "What is the cursor query?", "a": "A brute-force nearest-item search over the sample items, run in your browser each frame. The millisecond figure is that scan on your device, not a benchmark of any service." },
+      { "q": "What does search width change?", "a": "It sets how many nodes a graph search may visit. A larger width finds better neighbours and costs more time. The curve is a sample model." },
+      { "q": "Where do the prices come from?", "a": "They are invented for the concept and shown with the arithmetic, so you can check the sum." },
+      { "q": "Is the imagery real?", "a": "There is none stored. The lattice is drawn in code; any art slot is a procedural placeholder until an image is generated for it." }
+    ],
+    "cta": { "title": "Ask the lattice something.", "body": "Fictional product, so there is no key to take. The lattice is yours to move.", "label": "Back to the lattice", "href": "#top" }
+  },
+  "assets": { "plan": [
+    { "slot": "band", "source": "code" },
+    { "slot": "cta", "source": "procedural" },
+    { "slot": "og", "source": "generated-with-prompt", "prompt": "A small cube of clear glass spheres joined by thin chrome rods on a near-black teal ground, one sphere lit from within, empty left half, no text, no logos, no people.", "alt": "Glass lattice on a dark ground" }
+  ] },
+  "budgets": { "dprMax": 2, "dprMaxMobile": 1.5, "frameMs": 22, "mobileMaxWidth": 820 }
+}

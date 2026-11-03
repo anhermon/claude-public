@@ -62,6 +62,7 @@ decisions, names the failure modes, and closes the loop with a render and an ind
 | 3D scenes, point-morph, glass, shader backgrounds | skill `premium-web-webgl` (characters and mascots: `animated-objects`) |
 | drawn figures, diagrams, animated SVG, icon systems, filters | skill `premium-web-svg` |
 | generated imagery, image or video MCPs, consistent sets, scrub media | skill `premium-web-imagery` |
+| many pieces fast: a spec to a working page with one persistent 3D or shader subject, pricing calculator, mobile compositions (baseline; the wow stays bespoke) | skill `premium-web-factory` (`node skills/premium-web-factory/scripts/new-piece.mjs <spec> <out>`) |
 
 ## Scripts (run from the skill directory)
 
