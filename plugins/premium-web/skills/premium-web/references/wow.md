@@ -50,6 +50,12 @@ percent of the width and 30 percent of the height (tells.js `wow_visible`). Meas
 (2026-10, 2026-11): one object in the first viewport, display type 4.5-5.5x body, a ground change or a bleed every 1-2
 screens, no row of equal panels above the fold.
 
+Persistent-subject pages (one object that changes state per chapter over a ground that changes colour): this is the strongest
+structure measured, and the frames that carry the page are the HAND-OFFS between chapters, not the section stills. Judge hand-off
+frames first and make about 60 percent of the wow frames hand-offs (mid-morph, mid-ground change). A dense chart, calculator or
+table must have a PARKED subject state: while it is on screen the subject leaves that area (e.g. an IntersectionObserver on the
+interactive block sets the parked state). Verify every chapter at 1440 and 390 for subject versus text and subject versus nav.
+
 ## 5. Fallback and performance (hard)
 
 - Write the fallback frame first: the reduced-motion or no-WebGL poster states the claim on its own and scores at

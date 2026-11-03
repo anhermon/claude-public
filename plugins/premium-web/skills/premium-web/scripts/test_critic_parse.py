@@ -120,6 +120,7 @@ with tempfile.TemporaryDirectory() as d:
         img(out_dir / name / "390.png")
     for k in range(1, 3):
         img(out_dir / "wow" / f"1440-t{k}.png")
+    img(out_dir / "wow" / "1440-rm-t1.png")
     img(d / "refs" / "pass" / "a.png")
     img(d / "refs" / "fail" / "b.png")
 

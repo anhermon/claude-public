@@ -56,10 +56,13 @@ def measure(p):
     return vivid / n, strong / n, nh
 
 
+LOUD_MIN_HUES = 2
+
+
 def verdict(vivid, strong, nh):
     if vivid > TOY_VIVID or (vivid > TOY_VIVID_MULTI_HUE and nh >= HUES_FOR_TOY):
         return "TOY"
-    return "LOUD" if vivid > LOUD_VIVID else "ok"
+    return "LOUD" if vivid > LOUD_VIVID and nh >= LOUD_MIN_HUES else "ok"  # one dark ground + one glow hue is monochrome, not loud
 
 
 def main(args):

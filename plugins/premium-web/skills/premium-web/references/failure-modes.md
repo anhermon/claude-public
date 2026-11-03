@@ -24,12 +24,10 @@ The first model was ten causes. Testing it against the evidence changed it in fi
    collisions, half-drawn captures and figures below the fold, while polish stayed at 2-3. None of the 16
    teardowns lists an annotated data diagram among its recurring techniques; they carry sections with subject,
    type, media and light.
-3. **Imagery is not the universal gap.** From the 16 teardowns: 6 are almost fully procedural (code, shaders,
-   particles), 4 depend on ONE hero asset (a model, a portrait, a film), 6 are media-led genres (real estate,
-   retail, sport, jewellery, studio) that need 8-14 consistent images. The need depends on genre (F2, F4).
-4. **The critic can be wrong in both directions.** The builder grades itself leniently (F6), but a critic with only
-   a written rubric scored too strictly: no section in the pilot corpus got above 4, so "every section >= 4"
-   was unreachable. Bars must be set from external references, not from prose alone.
+3. **Imagery is not the universal gap.** Of 16 teardowns, 6 are procedural, 4 rely on ONE hero asset, 6 are media-led genres
+   needing 8-14 consistent images. The need depends on genre (F2, F4).
+4. **The critic can be wrong in both directions.** The builder grades itself leniently (F6), but a rubric-only critic scored
+   too strictly (no section above 4 in the pilot corpus). Set bars from external references, not from prose alone.
 5. **A banned default can be unlocked by a sentence.** Two pilots each wrote a paragraph justifying exactly the
    default the skill banned (warm paper plus a serif), and passed their own check. A default is unlocked only
    by an external reference that is not the category average (F1).
@@ -63,8 +61,9 @@ The first model was ten causes. Testing it against the evidence changed it in fi
   consistent generated or photographic media (8-14 images from one style sheet); a single hero asset is the
   middle case. If image generation is unavailable, draw the subject in code and say so (premium-web-imagery,
   premium-web-svg, premium-web-webgl).
-- **Check:** unautomated: scroll-shot every chapter and ask "is the subject visible or evoked in each?". Partial:
-  `tells.js` material and no_fullbleed; critic `focal_visual` per section.
+- **Check:** scroll-shot every chapter and ask "is the subject visible or evoked in each?"; the subject must not sit on copy, under
+  the nav, or over a dense chart (`verify-piece.mjs` collision and nav-clip checks, given a subject box). `tells.js` material and
+  no_fullbleed; critic `focal_visual`. A chrome that hides the subject at rest (a pill nav over it) is a defect, not a hand-off.
 
 ## F3 Layout without time
 
@@ -128,7 +127,7 @@ The first model was ten causes. Testing it against the evidence changed it in fi
   benchmarks and press, sample numbers presented as fact.
 - **Evidence:** the pilots avoided fabricated proof only because the brief forced a truth inventory and a
   concept tag; the tag still had to move from a fixed overlay (it covered content at 390) into the nav.
-- **Why:** true, specific claims need facts the model lacks; averaged claims are free.
+- **Why:** true, specific claims need facts the model lacks; averaged claims are free. Live measured readouts count as proof: Chrome coarsens `performance.now()`, so print "<0.1 ms" or time N repeats, never "0.00 ms".
 - **Prevent:** a truth inventory before copy (trust.md); every number has a source and a date or is labelled
   sample data; every headline passes a specificity test (swap the brand name: would it still be true of a
   competitor?).
@@ -197,3 +196,4 @@ The first model was ten causes. Testing it against the evidence changed it in fi
 | fresh critic, wow, page | F1 F4 F6 F10 | `scripts/critic.py` |
 | real mobile browser | F8 | `scripts/shoot.sh` |
 | metrics gate | F9 | `scripts/lighthouse.sh` |
+| all mechanical gates in one run | F6 F8 F9 | `scripts/verify-piece.mjs` |

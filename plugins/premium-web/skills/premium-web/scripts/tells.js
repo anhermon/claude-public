@@ -69,8 +69,10 @@
     let hitN = 0; for (let i = 0.5; i < 16; i++) for (let j = 0.5; j < 10; j++) { const x = sr.left + (sr.width * i) / 16, y = sr.top + (sr.height * j) / 10;
       if (rects.some((r) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)) hitN++; }
     return { section: name(s), coverage: +(hitN / 160).toFixed(2) }; });
-  const sparse = cover.filter((c) => c.coverage < 0.3);
-  out.empty_spacing = { per_section: cover, sparse: sparse.map((c) => c.section), hit: sparse.length >= Math.max(2, sections.length * 0.4) };
+  // A persistent subject (fixed/sticky canvas or [data-subject]) behind the sections IS the content of the "empty" area: count it as full coverage.
+  const persistentSubject = [...document.querySelectorAll("canvas, [data-subject], [data-gl]")].some((e) => { const cs = getComputedStyle(e), r = e.getBoundingClientRect(); const pinned = (n) => { for (; n && n !== document.body; n = n.parentElement) { const p = getComputedStyle(n).position; if (p === "fixed" || p === "sticky") return true; } return false; }; return vis(e) && (pinned(e) || e.hasAttribute("data-subject")) && r.width >= innerWidth * 0.5 && r.height >= innerHeight * 0.5; });
+  const sparse = persistentSubject ? [] : cover.filter((c) => c.coverage < 0.3);
+  out.empty_spacing = { per_section: cover, sparse: sparse.map((c) => c.section), persistentSubject, hit: sparse.length >= Math.max(2, sections.length * 0.4) };
 
   // 8. Category cliches (dev tools especially).
   const text = document.body.innerText;

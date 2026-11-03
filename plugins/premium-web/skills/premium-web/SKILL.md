@@ -35,9 +35,10 @@ decisions, names the failure modes, and closes the loop with a render and an ind
 5. **Build with the sub-skills.** Scroll choreography and text grammar: `premium-web-motion`. 3D and shaders:
    `premium-web-webgl`. Code-drawn figures, icons, filters: `premium-web-svg`. Generated imagery and scrub media:
    `premium-web-imagery`. Fetch fonts at build time (`scripts/get-font.sh`); never bundle them.
-6. **Render and look.** `scripts/serve.mjs`, then `scripts/chrome-shot.mjs`: 1440 and a true 390, section shots, wow
+6. **Render and look.** `node scripts/verify-piece.mjs <dir>` (serves, captures, runs every mechanical gate), then LOOK at what it names;
+   or by hand `scripts/serve.mjs` and `scripts/chrome-shot.mjs`: 1440 and a true 390, section shots, wow
    frames mid-animation, reduced-motion frames. Read every image and state what you saw (`references/qa-loop.md`).
-7. **Independent critic.** `scripts/tells.js` and `scripts/saturation.py` first, then `scripts/critic.py` (fresh
+7. **Independent critic.** `scripts/tells.js` and `scripts/saturation.py` first, then `scripts/critic-batch.mjs` / `critic.py` (flagged sections only; fresh
    critic per section, wow judged separately). At most 3 rounds per section; then replace the concept. Calibrate
    the bar against external references (`--pass-refs`, `--fail-refs`, `--calibrate DIR`).
 8. **Ship.** Gates: no horizontal scroll at 390, zero console errors, fonts rendered, Lighthouse and a real mobile
@@ -55,6 +56,7 @@ decisions, names the failure modes, and closes the loop with a render and an ind
 | writing copy, proof, concept labels, storefront claims | `references/trust.md` |
 | a form or lead capture is on the page | `references/forms.md` |
 | rendering, gates, the critic, calibration, release hygiene | `references/qa-loop.md` |
+| building several pieces, a token or wall-clock budget, batching and caching | `references/factory-efficiency.md` |
 | the result must be reproducible by another agent or a client brief | `references/spec-prompts.md` |
 | scroll choreography, text reveals, loader, transitions, pointer coupling | skill `premium-web-motion` |
 | 3D scenes, point-morph, glass, shader backgrounds | skill `premium-web-webgl` (characters and mascots: `animated-objects`) |
@@ -65,6 +67,10 @@ decisions, names the failure modes, and closes the loop with a render and an ind
 
 | script | what |
 |---|---|
+| `verify-piece.mjs` | ONE command, all mechanical gates, <= 40-line summary + `.verify/report.json` (use first, every round) |
+| `package-piece.mjs` | poster, size-budgeted loops, og, 8 section stills, piece.json entries (idempotent) |
+| `critic-batch.mjs` | critic only on flagged sections, round-capped (wraps `critic.py`) |
+| `asset-cache.mjs` | shared cache for generated imagery (`get` / `put`), outside the plugin |
 | `serve.mjs` | static server: no-store, trackers stubbed, scroll probe |
 | `chrome-shot.mjs` | Chrome capture over raw CDP: viewport shots, `SECTIONS`, `WOW`, `RM`, `EVAL`, overflow and font checks |
 | `shoot.sh` | Chrome plus real Mobile Safari in a private iOS Simulator (macOS, Xcode) |

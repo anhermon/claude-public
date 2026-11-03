@@ -14,6 +14,10 @@ render -> LOOK -> fix -> re-render, then the independent critic, then fix, repea
   its focal moment, do not polish. At most 4 whole-page rounds; then report what still fails instead of looping.
 - The early rounds LOOK and structure scans only; run the critic when you would otherwise ship (it takes minutes
   per run; `CRITIC_JOBS` runs sections in parallel; limit early critic runs to a subset of sections).
+- Build rounds count from the FIRST critic input, not from the first line of code: a WebGL or generated-asset page needs two
+  builds before any representative still exists. One critic round can take 25 minutes (9 sections plus wow); budget for it.
+- Cheap gates before expensive ones: `node scripts/verify-piece.mjs <dir> --fast` every round, the critic only on the sections it
+  flags (`node scripts/critic-batch.mjs <dir>`), the full run (Lighthouse, fps) on the final round. See `factory-efficiency.md`.
 - Log each round (scores and what changed) in SPEC.md or a `rounds.md` beside it.
 - Run the real-browser and Lighthouse gates on the FINAL round and name that round in the report.
 
@@ -31,6 +35,25 @@ emulation (touch, device scale factor 2). Flags: `RM=1` reduced motion, `SCHEME=
 `H=` viewport height, `SECTIONS=1`, `WOW=<selector>`, `WOW_ACT=<js>`, `SHOTS=0`, `CHROME_FLAGS` extra Chrome args.
 Check BOTH colour schemes if the page supports both. Lighthouse on localhost: trust accessibility, SEO, best
 practices and CLS; treat performance as relative and read the median of three mobile runs.
+
+One command for all of it: `node scripts/verify-piece.mjs <dir> [--fast]` serves the page and runs this gate plus the structure
+scan, saturation, stepped-scroll section stills (1440 and 390, pixel-settled), void, subject/text collision, subject clipped by the
+nav, tap-target and minimum-font checks, scroll fps and Lighthouse; it prints <= 40 lines and writes `.verify/report.json` and
+`.verify/sections/<nn-id>/{1440,390}.png`. Open only the stills it names. Declare the persistent subject to it (`piece.json`
+`verify.subject`, or `verify.subjectBox`: a JS expression returning `{x,y,w,h}` in viewport px) or the collision and nav-clip
+checks are skipped.
+- A page whose subject is a fixed canvas, a fixed nav and damped scroll does not fit `SECTIONS=1`. Bring your own shots: the
+  critic only needs `<sections-dir>/<nn-id>/1440.png`, `390.png` (a tall section adds `1440-p2.png`); `verify-piece` writes exactly
+  this layout. Any `<width>-tN.png` in a section dir is judged too: give pinned or morphing sections 3 to 5 frames.
+- Damped or eased scroll (the visible state follows the scroll position with lag): a jump-scroll then a fixed wait still shoots a
+  transition. Scroll in steps and wait until two frames match, or until the state value has caught up, before shooting. Judge
+  an in-flight frame as a hand-off, never as a defect.
+- Reveal states: words hidden at low opacity fail axe/Lighthouse `color-contrast` for every not-yet-revealed node. Treat those as a
+  reveal artefact (run Lighthouse after scrolling the whole page, or keep hidden text at 4.5:1), not 30 contrast defects.
+  `aria-label` is only valid on headings and landmarks: a split-text effect on a `<p>` must append a visually hidden copy and hide
+  the generated spans, or Lighthouse reports `aria-prohibited-attr`.
+- The font check reports the nearest named instance for a variable font ("SemiBold" for a weight-300 h1). Verify the weight by the
+  computed `font-weight` / `font-variation-settings`, not by that label.
 
 macOS has no GNU `timeout`; wrap long commands with `perl -e 'alarm shift; exec @ARGV' 600 <cmd>`.
 
@@ -72,6 +95,13 @@ python3 scripts/critic.py --calibrate DIR        # DIR contains pass/ and fail/ 
   anchors from `--pass-refs` and `--fail-refs`. The builder never grades its own work.
 - Pass/fail is computed by the script from the scores. Exit 0 = pass, 1 = fail, 2 = usage, 3 = critic unavailable
   (quota: the verdict is unknown, not failed).
+- Treat a critic fix as a symptom. It rewards features it can name (leader lines, a comparison table, labelled points), not craft
+  it can feel; chasing every list grows the page into a feature sheet. Fix the focal visual or the collision, not the named
+  widget, and log the fixes you decline with one line of why.
+- The critic judges stills. A pinned, scroll-driven chapter whose payoff is a hand-off scores at most 3 on focal visual from one still:
+  supply `<width>-tN.png` frames for it. Wow frames need reduced-motion twins `<width>-rm-tN.png` or `critic.py` exits 2.
+- Run it only where it pays: `node scripts/critic-batch.mjs <dir> [--sections a,b | --all] [--max-rounds 3]` (default = the sections
+  `verify-piece` flagged; a section past its round budget is skipped with the replace-or-ship verdict).
 - Wow is judged separately and is mandatory: below 4 fails the page whatever else scores; the fallback frame must
   score at least 3.
 
@@ -92,6 +122,11 @@ was unreachable); a critic with unlabeled anchors can drift lenient. Set the bar
   `--use-angle=metal --ignore-gpu-blocklist` (`CHROME_FLAGS`).
 - Safari's UA reports a frozen OS version; feature-detect, never UA-sniff. Simulator Safari caches hard (`serve.mjs`
   sends no-store). Reduced motion can only be set by hand in Simulator settings.
+- Record real frame timing, not only Lighthouse: scroll the page under a 4x CPU throttle and report p50/p99 frame time (the
+  page's own `stats()` if it has one). The throttle slows the CPU, not the GPU: a GPU-bound scene looks better than a phone will.
+  `verify-piece` does this and labels it a relative signal.
+- A readout that prints a measured value ("0.00 ms") must survive the browser's coarsened `performance.now()`: print "<0.1 ms" or
+  time N repeats and divide. Otherwise the critic, rightly, calls it fake.
 - The Simulator and emulation cannot tell real fps, Low Power Mode or thermal throttling; test a GPU-heavy wow on a
   real phone before launch.
 - Other agents may drive the same Simulator; `shoot.sh` creates a private device and deletes it on exit.

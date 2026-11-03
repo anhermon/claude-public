@@ -66,7 +66,9 @@ Annotated figures failed polish in every pilot that used many of them. When a fi
 - Stick-figure schematics: a few hairlines, boxes or bars standing in for a concept, with no labels, values or state.
 - Bare hairline-and-text: heading, rules and grey paragraphs with nothing designed.
 - Decorative numbering: 01/02/03 where order carries no information.
-- Whitespace as content: more than half the 1440 frame empty with nothing explaining the claim.
+- Whitespace as content: more than half the 1440 frame empty with no explanation AND no subject. A live canvas or object behind the
+  section is not whitespace (tells.js `empty_spacing` and the critic both skip it); an empty band beside a subject that is parked
+  elsewhere is (`verify-piece` reports it as a void).
 - A list with connector lines presented as a comparison (a comparison is a matrix of real attributes).
 - Status as decoration: a bar or chip per item that encodes one bit.
 - Interchangeable cards whose content could swap unnoticed.
@@ -119,6 +121,8 @@ sections); set the real bar from external references (qa-loop.md, "Calibration")
 
 ## 8. Special sections
 
+- **Pricing tiers** (and any table of rows that really are parallel) are the canonical use of `data-tell-ok="reason"`: a three-tier
+  price table is equal-sized by nature. Mark it and move on; do not invent asymmetry for its own sake.
 - **CTA and pricing are sections too.** Show what happens after the button (a dated sequence of the real
   artefacts) and let the form react to input; show cost across the range with the current point marked.
 - **Footer** is chrome and is judged at page level only.

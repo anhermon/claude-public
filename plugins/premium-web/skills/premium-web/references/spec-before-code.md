@@ -33,6 +33,10 @@ fixed overlay. See trust.md.
 | # | chapter | one message | subject state (form / position / camera) | ground and palette | transition in |
 |---|---|---|---|---|---|
 
+- Add two columns to the table: **text region** and **subject region** per chapter, for 1440 AND 390 (e.g. "copy left 45%,
+  subject right 50%"; mobile "subject top 40%, copy below"). Laying text and the subject out independently costs about three
+  rework rounds of "where does the object go so it does not sit on copy". Also write where the subject is PARKED when a dense
+  block (chart, calculator, table, form) is on screen, and that it never sits under the nav at rest. `verify-piece.mjs` checks both.
 - Every chapter changes at least two of: subject state, ground, scale of type, layout shape. No more than two
   consecutive chapters share a layout shape.
 

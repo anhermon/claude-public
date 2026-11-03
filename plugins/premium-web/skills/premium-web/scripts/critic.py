@@ -5,8 +5,11 @@ Usage:
   critic.py <sections-dir> --wow <id> [--wow-test "<acceptance test>"] [--pass-refs DIR] [--fail-refs DIR]
       <sections-dir> has one subdir of screenshots per section (from `SECTIONS=1 chrome-shot.mjs`); writes critic.json.
       --wow <id>        REQUIRED: the section dir holding the signature-moment frames (or --wow-exempt REASON for sub-pages)
+                        wow frames: <width>-tN.png (mid-animation) AND <width>-rm-tN.png (reduced motion; exit 2 if none: the
+                        Fallback criterion cannot be judged without them)
       --pass-refs DIR   optional folder (outside the repo) with 1-2 images per section type that the owner judged good
       --fail-refs DIR   optional folder with images judged bad or "nice but not wow"
+  critic.py <sections-dir> --wow <id> --only a,b   judge ONLY the named section dirs (+ the wow dir); critic-batch.mjs uses this
   critic.py --calibrate DIR   DIR holds pass/ and fail/ section images; reports where the critic disagrees
   critic.py --calibrate       prints how to build such a corpus (exit 2)
 
@@ -329,6 +332,7 @@ def build_parser():
     ap.add_argument("--wow-exempt", help="sub-pages only: reason the page inherits its site's wow")
     ap.add_argument("--pass-refs", help="folder of images the owner judged good")
     ap.add_argument("--fail-refs", help="folder of images the owner judged bad")
+    ap.add_argument("--only", help="comma-separated section dir names to judge (the --wow dir is always included)")
     ap.add_argument("--calibrate", nargs="?", const="", metavar="DIR", help="judge a labelled corpus DIR/pass, DIR/fail")
     return ap
 
@@ -355,6 +359,16 @@ def main(argv):
     if a.wow and a.wow not in secs:
         print(f"no frames for --wow {a.wow}")
         return EXIT_USAGE
+    if a.wow and not any("-rm-" in Path(p).name for p in secs[a.wow]):
+        print(f"no reduced-motion frames in {a.wow}: add <width>-rm-tN.png (chrome-shot.mjs with RM=1); the Fallback criterion cannot be judged")
+        return EXIT_USAGE
+    if a.only:
+        keep = {x.strip() for x in a.only.split(",")} | ({a.wow} if a.wow else set())
+        unknown = keep - set(secs)
+        if unknown:
+            print(f"--only names no section dir: {', '.join(sorted(unknown))}")
+            return EXIT_USAGE
+        secs = {k: v for k, v in secs.items() if k in keep}
     w = None
     with ThreadPoolExecutor(int(os.environ.get("CRITIC_JOBS", 4))) as ex:
         names = [k for k in secs if k != a.wow]
