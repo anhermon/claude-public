@@ -7,7 +7,7 @@ A spec is one JSON file. `spec.schema.json` is the contract (the generator rejec
 
 1. Concept: invent it, label it (`concept.notice`, `concept.noticeShort`), no real brand, person or product. Say plainly that
    numbers are invented. Every page the factory builds carries the notice in the nav and the footer.
-2. Subject kind (see SKILL.md). One persistent subject, never a second one.
+2. Page grammar (`references/grammars.md`), then subject kind for morph-subject. Rail has panels and no subject.
 3. Chapters: pick archetypes in reading order, give each one with a `target` a layout and a placement.
 4. Direction: palette, fonts, one `ground` entry per act.
 5. Commerce (needed by `pricing`, `faq`, `footer`), then the assets plan.
@@ -16,6 +16,7 @@ A spec is one JSON file. `spec.schema.json` is the contract (the generator rejec
 
 | Key | Notes |
 |---|---|
+| `grammar`, `hero`, `readout`, `scroll`, `rail` | Page structure first: see `grammars.md` for both grammars, all hero layouts and the rail panel contract. Omitted grammar preserves legacy output. |
 | `name`, `slug` | `name` is the wordmark (the giant type). Keep it short: 4 to 9 letters fit a wide band. |
 | `concept` | `notice` (long, nav on desktop), `noticeShort` (nav on mobile), `description` (meta). |
 | `direction.palette` | `ground`, `ink`, `inkSoft`, `accent` required; `accentText` is the accent used on text (keep contrast); `light{}` holds the light-world overrides. |

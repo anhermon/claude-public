@@ -1,8 +1,8 @@
 # When not to use the factory
 
-- **The page is not one subject plus sections.** Multi-object scenes, a scroll-scrubbed video, a pinned storytelling sequence: use
-  premium-web-webgl or premium-web-motion directly.
-- **The brief demands bespoke art direction in every section.** The factory fixes the section grammar; it will give a baseline, not
+- **The page is outside morph-subject or rail.** Multi-object scenes, a scroll-scrubbed video, bespoke pinned storytelling: use
+  premium-web-webgl or premium-web-motion directly. Code-only panel rails are supported (`grammars.md`).
+- **The brief demands bespoke art direction in every section.** The factory offers two grammars; it will give a baseline, not
   a distinctive page. Use it for the baseline and hand-build what is distinctive, or skip it.
 - **A real product with real data.** Factory pieces are concept pages: invented names, labelled numbers. Do not point one at a real
   brand without rewriting the copy and the notice.

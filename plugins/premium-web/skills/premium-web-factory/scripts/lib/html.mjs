@@ -5,10 +5,10 @@ import { esc } from '../../archetypes/_shared.mjs';
 const MARK = (accent) => `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3.4" fill="${accent}"/></svg>`;
 
 export function indexHtml(piece, env) {
-  const heroCh = piece.chapters[0];
-  const nav = piece.chapters.filter((c) => c.nav).map((c) => `<a href="#${c.id}">${esc(c.nav)}</a>`).join('');
+  const heroCh = env.hero || piece.chapters[0];
+  const nav = (env.navigation || piece.chapters).filter((c) => c.nav).map((c) => `<a href="#${c.id}">${esc(c.nav)}</a>`).join('');
   const cta = (heroCh.copy.ctas || [])[0];
-  const body = piece.chapters.map((c) => ARCHETYPES[c.archetype].render(c, piece, env)).join('\n\n');
+  const body = env.body ?? piece.chapters.map((c) => (env.archetypes || ARCHETYPES)[c.archetype].render(c, piece, env)).join('\n\n');
   const preload = (piece.fontFiles || []).map((f) => `<link rel="preload" href="fonts/${esc(f)}" as="font" type="font/woff2" crossorigin>`).join('\n');
   const bg = piece.worlds[0].base;
   return `<!doctype html>

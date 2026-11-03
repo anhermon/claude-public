@@ -21,3 +21,9 @@ export const MOTION_PATCH = {
   why: 'the motion template spreads its own onReveal over the loader options; a piece must be able to start the subject assembly when the curtain lifts',
 };
 export const REDUCED_FLAG = 'rm';
+export const GRAMMAR_MORPH = 'morph-subject', GRAMMAR_RAIL = 'rail';
+export const HERO_DEFAULTS = { layout: 'split', wordmark: true };
+export const SCROLL_DEFAULTS = { mode: 'morph' };
+export const READOUT_DEFAULT = 'card';
+export const RAIL_DEFAULTS = { damping: 0.12, panelVw: 100, scrollRatio: 1, velocityMax: 1.2, ambientLines: 12, transition: 'scale' };
+export const MORPH_MIN_CHAPTERS = 3;

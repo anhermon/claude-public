@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { generate } from './new-piece.mjs';
 import { sha } from './lib/manifest.mjs';
 import { MANIFEST_FILE } from './lib/const.mjs';
+import { grammarSelftest } from './grammar-selftest.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const EXAMPLE = path.join(HERE, '..', 'example.spec.json');
@@ -54,6 +55,7 @@ export async function selftest() {
     try { generate(badSpec, path.join(tmp, 'bad'), OPTS); } catch { rejected = true; }
     check('invalid spec is rejected', rejected);
     check('deterministic: same spec -> same spec hash', JSON.parse(fs.readFileSync(path.join(out, MANIFEST_FILE), 'utf8')).specHash === man.specHash);
+    await grammarSelftest(tmp, check);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
   console.log(failures.length ? `SELFTEST FAILED: ${failures.length} check(s)` : 'SELFTEST OK');
   return failures.length ? 1 : 0;

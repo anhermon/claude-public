@@ -3,9 +3,20 @@
   "title": "premium-web-factory piece spec",
   "description": "One declarative file per piece. new-piece.mjs validates it against this schema (subset: type, enum, required, properties, items, min/max, pattern), then emits a runnable page. Decisions only; no code, no long copy beyond what a section shows.",
   "type": "object",
-  "required": ["name", "concept", "direction", "subject", "chapters"],
+  "required": ["name", "concept", "direction"],
+  "allOf": [{ "if": { "required": ["grammar"], "properties": { "grammar": { "const": "rail" } } }, "then": { "required": ["rail"] }, "else": { "required": ["subject", "chapters"] } }],
   "additionalProperties": false,
   "properties": {
+    "grammar": { "type": "string", "enum": ["morph-subject", "rail"], "default": "morph-subject" },
+    "hero": { "type": "object", "additionalProperties": false, "properties": {
+      "layout": { "type": "string", "enum": ["split", "stack", "bleed", "type-only"], "default": "split" },
+      "wordmark": { "type": "boolean", "default": true }
+    } },
+    "readout": { "type": "string", "enum": ["card", "inline", "none"], "default": "card" },
+    "scroll": { "type": "object", "additionalProperties": false, "properties": {
+      "mode": { "type": "string", "enum": ["morph", "orbit", "static"], "default": "morph" }
+    } },
+    "rail": { "$ref": "#/$defs/rail" },
     "name": { "type": "string", "minLength": 2, "description": "Product or piece name. Also the giant wordmark (upper-cased) and the loader wordmark." },
     "slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "description": "Optional. Defaults to the lower-cased name." },
     "lang": { "type": "string", "default": "en" },
@@ -102,7 +113,7 @@
     },
     "chapters": {
       "type": "array",
-      "minItems": 3,
+      "minItems": 1,
       "items": {
         "type": "object",
         "required": ["id", "archetype"],
@@ -200,6 +211,28 @@
     }
   },
   "$defs": {
+    "rail": { "type": "object", "required": ["panels"], "additionalProperties": false, "properties": {
+      "panels": { "type": "array", "minItems": 2, "maxItems": 8, "items": {
+        "type": "object", "required": ["id", "title", "copy", "figure"], "additionalProperties": false, "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "title": { "type": "string", "minLength": 1 }, "copy": { "type": "string", "minLength": 1 },
+          "eyebrow": { "type": "string" }, "nav": { "type": "string" },
+          "figure": { "type": "object", "required": ["kind", "label"], "additionalProperties": false, "properties": {
+            "kind": { "type": "string", "enum": ["stat", "timeline", "diagram", "quote-free"] },
+            "label": { "type": "string" }, "value": { "type": "string" },
+            "items": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "type": "string" } }
+          } }
+        }
+      } },
+      "params": { "type": "object", "additionalProperties": false, "properties": {
+        "damping": { "type": "number", "minimum": 0.05, "maximum": 0.3 },
+        "panelVw": { "type": "number", "minimum": 85, "maximum": 100 },
+        "scrollRatio": { "type": "number", "minimum": 0.6, "maximum": 1.8 },
+        "velocityMax": { "type": "number", "minimum": 0, "maximum": 1.5 },
+        "ambientLines": { "type": "integer", "minimum": 4, "maximum": 24 },
+        "transition": { "type": "string", "enum": ["scale", "wipe"] }
+      } }
+    } },
     "font": {
       "type": "object",
       "required": ["id"],

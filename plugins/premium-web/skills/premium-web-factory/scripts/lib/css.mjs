@@ -75,12 +75,12 @@ html.is-loading body::before { content: ""; position: fixed; inset: 0; z-index: 
 `;
 }
 
-export function sectionsCss(piece) {
+export function sectionsCss(piece, archetypes = ARCHETYPES) {
   const seen = new Set(), parts = [SHARED_CSS(piece)];
   for (const ch of piece.chapters) {
     if (seen.has(ch.archetype)) continue;
     seen.add(ch.archetype);
-    parts.push(ARCHETYPES[ch.archetype].css(piece, ch));
+    parts.push(archetypes[ch.archetype].css(piece, ch));
   }
   return parts.join('\n');
 }

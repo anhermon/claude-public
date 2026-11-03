@@ -2,21 +2,22 @@
 name: premium-web-factory
 description: >
   A small deterministic generator for premium single-page pieces: a short declarative spec (JSON) in, a working page out,
-  with no LLM in the loop. The page has one persistent 3D or shader subject that morphs through choreographed sections
-  (hero, claim, explainer, band, stat, ship, pricing, faq, footer), a live pricing calculator that drives the subject,
-  separate mobile compositions, reduced-motion and no-WebGL fallbacks, and a manifest so regeneration is safe. Three subject
-  kinds: glass-lattice, point-cloud, shader-field. Use for "generate a premium page from a spec", "spin up another piece like
+  with no LLM in the loop. Choose a page grammar: morph-subject (persistent 3D/shader, four hero layouts, morph/orbit/static
+  scroll) or rail (code-only pinned horizontal panels, kinetic type, SVG contours; vertical on mobile). Both share tokens,
+  fonts, nav, live commerce, fallbacks and safe manifest regeneration. Three subject kinds: glass-lattice, point-cloud,
+  shader-field. Use for "generate a premium page from a spec", "spin up another piece like
   the last one", "scaffold a 3D landing page fast", "a concept page with a 3D subject and a pricing calculator", or when
   premium-web needs a strong baseline in seconds so the effort can go to the one bespoke wow moment.
-  Do NOT use for hand-built one-off scenes (premium-web-webgl), for pages with no persistent subject or with a different
-  structure (premium-web), for dashboards or app UI, for characters or mascots, or when the brief needs bespoke art direction
+  Also use for "generate a pinned horizontal rail from JSON, no 3D" and "vary hero layout and scroll grammar".
+  Do NOT use for hand-built one-off scenes (premium-web-webgl), for structures outside these grammars (premium-web),
+  for dashboards or app UI, for characters or mascots, or when the brief needs bespoke art direction
   on every section.
 ---
 
 # premium-web-factory
 
 Spec in, page out. `node scripts/new-piece.mjs <spec.json> <out-dir>` writes a complete static piece (HTML, CSS, JS, vendored
-three, fonts) in about 20 ms (about 1-2 s the first time, while fonts download). Same spec plus same factory gives the same
+three for morph-subject, fonts) in about 20 ms (about 1-2 s the first time, while fonts download). Same spec plus same factory gives the same
 bytes. It reuses the webgl stage rig, the motion template and the vendored three r170 from the sibling skills at generation
 time; none of that is duplicated here.
 
@@ -32,13 +33,16 @@ time; none of that is duplicated here.
 
 ## Workflow
 
-1. Write the spec: read `references/spec-authoring.md`, start from `example.spec.json`, check against `spec.schema.json`.
+1. Pick the grammar using `references/grammars.md`, then read `references/spec-authoring.md` and `spec.schema.json`.
+   Start morph-subject from `example.spec.json`; rail needs `rail.panels` and no `subject`.
    Invent a concept, label it as such (`concept.notice`), use no real brands.
 2. `node scripts/new-piece.mjs spec.json out/piece` (`--dry-run` to preview, `--no-fonts` to stay offline).
 3. Serve and LOOK: `node ../premium-web/scripts/verify-piece.mjs out/piece` (sections at 1440 and 390, console, h-scroll).
    Also open `?nogl` (poster path) and `?rm` (reduced motion). Fix the spec or the factory, never the generated files.
 4. Add the one wow moment in `bespoke/index.js`; fill art slots via premium-web-imagery; run the critic loop from premium-web.
 5. Regenerate after any spec change. The manifest refuses to overwrite a generated file you hand-edited unless `--force`.
+6. Run `node ../premium-web/scripts/variation-check.mjs <registry-or-dirs...>` across the portfolio before adding a piece.
+   Every new piece must use a different grammar OR a different `hero.layout` + `scroll.mode` combination from every existing piece.
 
 ## Commands
 
@@ -58,19 +62,22 @@ time; none of that is duplicated here.
 | `point-cloud` | 24k GPU points morphing between layouts, additive glow (ink dots on light grounds) | warm, dense, "swarm" concepts | same |
 | `shader-field` | caustic ink flow around item wells, wordmark seen through the flow | atmosphere-first concepts; calm copy zones | same |
 
-Pick the kind from the concept, then vary layouts, palette, side per chapter. Two specs with the same kind should still differ.
+Pick the grammar first. Rail has no 3D subject. Within morph-subject pick the kind, hero composition and scroll mode from the concept.
 
 ## Hard limits
 
 - Items: 8-256 (shader-field at most 64, enforced); point-cloud takes a third of its points on mobile.
-- Archetype order is free, but `pricing` and `faq` need `commerce`, and every archetype with a `target` adds one act (one ground
+- Morph archetype order is free, but `pricing` and `faq` need `commerce`, and every archetype with a `target` adds one act (one ground
   entry per act in `direction.ground`).
+- Rail takes 2–8 panels; optional `chapters` contain only `pricing` and `faq`, rendered vertically after the rail, without targets.
+- Omitted `grammar` preserves the original output bytes. New options also emit `spec/piece.json` for the portfolio gate.
 - The factory has no CDN at runtime and writes no timestamps. Output is static files; serve over http (file:// blocks modules).
 - Do not hand-edit generated files. Extend per `references/extending.md`.
 
 ## References
 
 - `references/spec-authoring.md` how to write a spec: fields, layouts, placement, palette, ground, commerce math.
+- `references/grammars.md` concept decision table, hero variants, rail fields/params, portfolio gate and verification.
 - `references/archetypes.md` each archetype: copy fields, params, mobile composition, the critic fixes it encodes.
 - `references/extending.md` bespoke hook, custom subject module, adding an archetype or kind, the write policy.
 - `references/when-not.md` when the factory is the wrong tool and what to use instead.
