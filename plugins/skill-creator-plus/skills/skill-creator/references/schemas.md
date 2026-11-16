@@ -300,6 +300,95 @@ Wall clock timing for a run. Located at `<run-dir>/timing.json`.
 
 ---
 
+## stages.json
+
+The stages of the skill under test, written once per iteration at `<workspace>/iteration-N/stages.json` before the runs start. Derived from the skill's workflow. Baseline runs use the same list; work that fits no stage goes to `other`.
+
+```json
+{
+  "stages": [
+    {"name": "read-input", "description": "Load and parse the user's files"},
+    {"name": "build-report", "description": "Write the report from the parsed data"},
+    {"name": "other", "description": "Anything outside the stages above"}
+  ]
+}
+```
+
+- `name`: short kebab-case, unique, the same from one iteration to the next.
+- The order is the order the stages normally happen in; the waterfall rows follow it.
+
+---
+
+## stages.jsonl
+
+Stage boundary marks, one JSON object per line, appended by the executor to `<run-dir>/stages.jsonl` while it works.
+
+```jsonl
+{"stage": "read-input", "event": "start", "t": 1768473000.12}
+{"stage": "read-input", "event": "end", "t": 1768473012.8}
+{"stage": "build-report", "event": "start", "t": 1768473012.9}
+{"stage": "build-report", "event": "end", "t": 1768473041.5}
+```
+
+- `event`: `start` or `end`. `t`: epoch seconds as a number (`python3 -c 'import time;print(time.time())'` works on macOS and Linux; `date +%s.%N` does not work on macOS).
+- A stage may repeat; its duration is the sum of its intervals. A stage may be nested in or overlap another: each keeps its own time, and the accounted time counts every second once.
+- Lines that are not valid, an end without a start, a start without an end and a stage missing from `stages.json` are reported as gaps in `stage_timing.json`; they never stop the benchmark.
+
+---
+
+## stage_timing.json
+
+Written by `scripts/stage_timing.py` (called from `aggregate_benchmark.py`), in two places.
+
+**Per run**, `<run-dir>/stage_timing.json`:
+
+```json
+{
+  "stages": [
+    {"name": "read-input", "start_offset_seconds": 0.0, "duration_seconds": 12.68, "intervals": 1},
+    {"name": "build-report", "start_offset_seconds": 12.78, "duration_seconds": 28.6, "intervals": 1}
+  ],
+  "total_seconds": 45.0,
+  "accounted_seconds": 41.28,
+  "unaccounted_seconds": 3.72,
+  "gaps": []
+}
+```
+
+- `start_offset_seconds` is relative to the run's earliest valid start mark. `duration_seconds` and `start_offset_seconds` are `null` for a stage with no complete start/end pair.
+- `total_seconds` comes from the run's `timing.json` (`total_duration_seconds`, else `duration_ms` / 1000), `null` when absent. `unaccounted_seconds` is the total minus `accounted_seconds` (never below 0), `null` when there is no total.
+- `gaps`: plain-text sentences, one per problem found in the marks.
+
+**Per iteration**, `<workspace>/iteration-N/stage_timing.json`, also the `stage_timing` section of `benchmark.json`:
+
+```json
+{
+  "stages": [{"name": "read-input", "description": "Load and parse the user's files"}],
+  "configurations": {
+    "with_skill": {
+      "runs": 3,
+      "runs_total": 3,
+      "stages": {
+        "read-input": {
+          "duration_seconds": {"mean": 11.0, "stddev": 1.2, "min": 10.0, "max": 12.4},
+          "start_offset_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
+          "runs": 3
+        }
+      },
+      "total_seconds": {"mean": 45.0, "stddev": 2.0, "min": 43.0, "max": 47.0},
+      "unaccounted_seconds": {"mean": 3.7, "stddev": 0.5, "min": 3.2, "max": 4.2}
+    }
+  },
+  "gaps": [{"run": "case-one/with_skill/run-2", "issue": "stage build-report has no end mark, so its duration is unknown and left out"}]
+}
+```
+
+- `runs` counts the runs with a `stages.jsonl`, `runs_total` all runs of that configuration. Only runs with a complete interval for a stage count toward that stage's stats (`stages.<name>.runs`).
+- The section is absent from `benchmark.json` when no run has a `stages.jsonl`.
+- `<workspace>/iteration-N/waterfall.svg` is the standalone chart of the same means, with the previous iteration (`iteration-(N-1)/stage_timing.json`) as an extra panel when it exists. The viewer's Benchmark tab shows the same chart.
+
+---
+
 ## benchmark.json
 
 Output from Benchmark mode. Located at `benchmarks/<timestamp>/benchmark.json`.

@@ -29,7 +29,19 @@ claude.ai account skills sync into `~/.claude/skills/synced/<id>/skill-creator`.
 | `upstream/UPSTREAM.md` | Source path, sync date, sha256 manifest. Rewritten by the sync script. |
 | `skills/skill-creator/` | The shipped skill. Upstream plus local changes. |
 | `scripts/sync-upstream.sh` | Resync tool. |
-| `tests/` | Tests for the sync script. |
+| `skills/skill-creator/scripts/stage_timing.py` | Local addition: per-stage timing and waterfall chart (not in upstream). |
+| `tests/` | Tests for the sync script and for stage timing. |
+
+## Local extension: stage timing
+
+Evals measure duration per stage as well as pass rate, and the improve loop uses both (score first, duration second).
+
+1. The skill's stages are listed once per iteration in `iteration-N/stages.json`.
+2. Each run appends start/end marks to `<run>/stages.jsonl`. Missing or unbalanced marks are reported as gaps, never as errors.
+3. `python -m scripts.aggregate_benchmark <iteration-dir>` (or `python -m scripts.stage_timing <iteration-dir>` alone, run from `skills/skill-creator/`) writes `stage_timing.json` per run and per iteration, a stage table in `benchmark.md`, and `waterfall.svg`.
+4. The viewer's Benchmark tab shows the waterfall: one panel per configuration plus the previous iteration. Without a browser, open `waterfall.svg`.
+
+Edits to upstream files are small inserted sections so `sync-upstream.sh` still merges cleanly; the logic is in the new `stage_timing.py`.
 
 ## Rule
 

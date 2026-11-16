@@ -366,11 +366,37 @@ def load_previous_iteration(workspace: Path) -> dict[str, dict]:
     return result
 
 
+def build_stage_chart(workspace: Path, benchmark: dict | None, previous_workspace: Path | None) -> dict | None:
+    """Stage timing for the Benchmark tab's waterfall: the data and the chart as an SVG string.
+
+    Uses the benchmark's stage_timing section, else the workspace's stage_timing.json.
+    The previous iteration comes from --previous-workspace, else the iteration-(N-1) beside this one.
+    Returns None when no run recorded stage marks.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    try:
+        from scripts import stage_timing
+    except ImportError:
+        return None
+    finally:
+        sys.path.pop(0)
+    current = (benchmark or {}).get("stage_timing") or stage_timing.load_aggregate(workspace)
+    if not isinstance(current, dict) or not isinstance(current.get("configurations"), dict):
+        return None
+    previous = stage_timing.load_aggregate(previous_workspace or stage_timing.previous_iteration_dir(workspace))
+    return {
+        "stage_timing": current,
+        "previous_stage_timing": previous,
+        "svg": stage_timing.render_waterfall_svg(current, previous),
+    }
+
+
 def generate_html(
     runs: list[dict],
     skill_name: str,
     previous: dict[str, dict] | None = None,
     benchmark: dict | None = None,
+    stage_chart: dict | None = None,
 ) -> str:
     """Generate the complete standalone HTML page with embedded data."""
     template_path = Path(__file__).parent / "viewer.html"
@@ -394,6 +420,8 @@ def generate_html(
     }
     if benchmark:
         embedded["benchmark"] = benchmark
+    if stage_chart:
+        embedded["stage_chart"] = stage_chart
 
     # "</script>" or "<!--" inside an output file would otherwise break the page's own script
     data_json = json.dumps(embedded).replace("<", "\\u003c")
@@ -439,6 +467,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         feedback_path: Path,
         previous: dict[str, dict],
         benchmark_path: Path | None,
+        previous_workspace: Path | None,
         *args,
         **kwargs,
     ):
@@ -447,6 +476,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.feedback_path = feedback_path
         self.previous = previous
         self.benchmark_path = benchmark_path
+        self.previous_workspace = previous_workspace
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:
@@ -459,7 +489,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
                     benchmark = json.loads(self.benchmark_path.read_text())
                 except (json.JSONDecodeError, OSError):
                     pass
-            html = generate_html(runs, self.skill_name, self.previous, benchmark)
+            stage_chart = build_stage_chart(self.workspace, benchmark, self.previous_workspace)
+            html = generate_html(runs, self.skill_name, self.previous, benchmark, stage_chart)
             content = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -560,8 +591,11 @@ def main() -> None:
         except (json.JSONDecodeError, OSError):
             pass
 
+    previous_workspace = args.previous_workspace.resolve() if args.previous_workspace else None
+    stage_chart = build_stage_chart(workspace, benchmark, previous_workspace)
+
     if args.static:
-        html = generate_html(runs, skill_name, previous, benchmark)
+        html = generate_html(runs, skill_name, previous, benchmark, stage_chart)
         args.static.parent.mkdir(parents=True, exist_ok=True)
         args.static.write_text(html)
         print(f"\n  Static viewer written to: {args.static}\n")
@@ -570,7 +604,7 @@ def main() -> None:
     # Kill any existing process on the target port
     port = args.port
     _kill_port(port)
-    handler = partial(ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path)
+    handler = partial(ReviewHandler, workspace, skill_name, feedback_path, previous, benchmark_path, previous_workspace)
     try:
         server = HTTPServer(("127.0.0.1", port), handler)
     except OSError:

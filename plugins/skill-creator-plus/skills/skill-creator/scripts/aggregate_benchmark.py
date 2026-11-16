@@ -51,6 +51,11 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    from scripts import stage_timing
+except ImportError:  # run as a plain script from the scripts/ folder
+    import stage_timing
+
 # The skill under test, and the configurations it is compared against
 PRIMARY_CONFIGS = {"with_skill", "new_skill"}
 BASELINE_CONFIGS = {"without_skill", "old_skill"}
@@ -219,6 +224,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
                     "eval_name": eval_name,
                     "eval_dir": eval_dir.name,
                     "run_number": run_number,
+                    "run_dir": run_dir,
                     "pass_rate": grading.get("summary", {}).get("pass_rate", 0.0),
                     "passed": grading.get("summary", {}).get("passed", 0),
                     "failed": grading.get("summary", {}).get("failed", 0),
@@ -361,6 +367,12 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
             no_delta = len(results) > 1 and run_summary["delta"][key] is None
             notes.append(f"{name.capitalize()} recorded for {counts}" + (f", so there is no {name} delta." if no_delta else "."))
 
+    stage_runs = [
+        (config, f"{r['eval_dir']}/{config}/run-{r['run_number']}", r["run_dir"])
+        for config in results for r in results[config]
+    ]
+    stages = stage_timing.build_stage_timing(benchmark_dir, stage_runs)
+
     benchmark = {
         "metadata": {
             "skill_name": skill_name or "<skill-name>",
@@ -375,6 +387,8 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
         "run_summary": run_summary,
         "notes": notes
     }
+    if stages:
+        benchmark["stage_timing"] = stages
 
     return benchmark
 
@@ -427,6 +441,10 @@ def generate_markdown(benchmark: dict) -> str:
     # With a single configuration there is nothing to compare: keep only its column
     if len(configs) < 2:
         lines = ["|".join(line.split("|")[:3]) + "|" if line.startswith("|") else line for line in lines]
+
+    # Stage timing section (only when runs recorded stage marks)
+    if benchmark.get("stage_timing"):
+        lines.extend(["", stage_timing.markdown_table(benchmark["stage_timing"])])
 
     # Notes section
     if benchmark.get("notes"):
@@ -500,6 +518,11 @@ def main():
     with open(output_md, "w") as f:
         f.write(markdown)
     print(f"Generated: {output_md}")
+
+    # Write stage_timing.json and waterfall.svg beside it
+    if benchmark.get("stage_timing"):
+        for path in stage_timing.write_artifacts(args.benchmark_dir, benchmark["stage_timing"]):
+            print(f"Generated: {path}")
 
     # Print summary
     run_summary = benchmark["run_summary"]

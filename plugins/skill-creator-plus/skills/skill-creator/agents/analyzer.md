@@ -231,6 +231,15 @@ Look at time_seconds, tokens, tool_calls:
 - Is there high variance in resource usage?
 - Are there outlier runs that skew the aggregates?
 
+### Step 4b: Analyze Stage Timing
+
+When benchmark.json has a `stage_timing` section (see `references/schemas.md`):
+- Rank the stages by mean duration in each configuration and name the slowest two or three, with their share of the run's total time.
+- For each of them, open the transcripts of the slowest runs and say what the time went on (for example repeated file reads, retries after an error, a long generation, waiting on a script). Quote the step. Keep to what the transcript shows.
+- Compare configurations and, if present, the previous iteration: which stages got faster or slower. Call a change real only when it is larger than the stage's stddev; with 1-2 runs say there is not enough data to separate it from noise.
+- For each slow stage, add one note starting with "Proposal:" naming a concrete change to the skill that should cut that stage's time without lowering the pass rate. These are the only improvement suggestions this analysis makes.
+- Report `unaccounted_seconds` when it is a large share of the total, and the `gaps` (missing or unbalanced marks), because they limit what the numbers can tell.
+
 ### Step 5: Generate Notes
 
 Write freeform observations as a list of strings. Each note should:
@@ -245,6 +254,8 @@ Examples:
 - "Skill adds 13s average execution time but improves pass rate by 50%"
 - "Token usage is 80% higher with skill, primarily due to script output parsing"
 - "All 3 without-skill runs for eval 1 produced empty output"
+- "Stage 'build-report' is 62% of with-skill time (31.0s ± 2.1s); in the slowest run the transcript shows three full re-reads of the template before writing"
+- "Stage 'read-input' fell from 14.2s to 9.8s since iteration 1 (stddev 1.1s), beyond run-to-run noise"
 
 ### Step 6: Write Notes
 
@@ -270,7 +281,7 @@ When these notes go into the `notes` list of benchmark.json, add them after any 
 - Provide context that helps interpret the numbers
 
 **DO NOT:**
-- Suggest improvements to the skill (that's for the improvement step, not benchmarking)
+- Suggest improvements to the skill (that's for the improvement step, not benchmarking), other than the stage-duration proposals in Step 4b
 - Make subjective quality judgments ("the output was good/bad")
 - Speculate about causes without evidence
 - Repeat information already in the run_summary aggregates

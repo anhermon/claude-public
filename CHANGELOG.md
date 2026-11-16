@@ -4,6 +4,7 @@
 
 ### Added
 
+- **skill-creator-plus 0.2.0: per-stage timing and a duration waterfall.** Evals now measure duration per stage of the tested skill, not only the total. `iteration-N/stages.json` lists the stages, executors append marks to `<run>/stages.jsonl`, and `scripts/stage_timing.py` computes per-stage durations, unaccounted time and mean/stddev per configuration. The benchmark gets a stage table, the viewer's Benchmark tab a waterfall chart (with the previous iteration), and each iteration a standalone `waterfall.svg`. The improve loop and analyzer now use stage timings, with score first and duration second.
 - **skill-creator-plus plugin (0.1.0)** — Anthropic's `skill-creator` skill from the claude.ai-synced copy (the GitHub copy is frozen at March 2026), kept as a pristine `upstream/` copy plus a locally extensible `skills/` copy. `scripts/sync-upstream.sh` resyncs upstream and 3-way merges the delta into `skills/`. Apache-2.0, credited to Anthropic.
 
 ## [0.2.3] — 2026-04-07

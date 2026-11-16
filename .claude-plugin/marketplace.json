@@ -206,7 +206,7 @@
     {
       "name": "skill-creator-plus",
       "description": "Anthropic's skill-creator skill (claude.ai-shipped version) with local extensions and a repeatable resync from upstream.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "Angel Hermon"
       },

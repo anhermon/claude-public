@@ -173,14 +173,22 @@ Put results in `<skill-name>-workspace/` as a sibling to the skill directory. Wi
     │   ├── with_skill/           # a configuration; with one run, also the run directory
     │   │   ├── outputs/          # the files the run produced
     │   │   ├── grading.json
-    │   │   └── timing.json
+    │   │   ├── timing.json
+    │   │   ├── stages.jsonl      # stage marks the run wrote (see "Stage timing")
+    │   │   └── stage_timing.json # per-stage durations, written by the benchmark script
     │   └── without_skill/        # the baseline (or old_skill/), with the same contents
     ├── handles-empty-file/
+    ├── stages.json               # the skill's stages, once per iteration (see "Stage timing")
     ├── benchmark.json
-    └── benchmark.md
+    ├── benchmark.md
+    └── waterfall.svg             # stage waterfall, written by the benchmark script
 ```
 
 Keep to this layout, because the viewer and the aggregation script both read it. A run directory is the one that holds a run's `outputs/`, `grading.json` and `timing.json`. If you run a configuration more than once, give each run its own inside it (`with_skill/run-1/`, `with_skill/run-2/`, ...); `eval_metadata.json` stays where it is.
+
+### Stage timing: define the stages (once per iteration)
+
+Besides pass rate, we measure how long each stage of the skill takes, so the loop can improve duration as well as score. Before spawning runs, derive the stages from the skill's own workflow (its steps or phases in SKILL.md), as a short ordered list, and write it to `<workspace>/iteration-<N>/stages.json` (format in `references/schemas.md`). Use short kebab-case names such as `read-input`, `build-report`, with a one-line description each, and aim for 3-8 stages: enough to show where time goes, few enough that marking stays cheap. Baseline runs (`without_skill`, `old_skill`) use the same list where it fits; work that fits no stage goes to a stage named `other`. Keep the names the same from one iteration to the next so the waterfall can compare them. If the skill changes shape between iterations, rewrite `stages.json` and say so in the iteration notes.
 
 ### Step 1: Spawn all runs (with-skill AND baseline) in the same turn
 
@@ -195,6 +203,9 @@ Execute this task:
 - Input files: <full paths of the test's input files, or "none">
 - Save outputs to: <workspace>/iteration-<N>/<case-name>/with_skill/outputs/
 - Outputs to save: <what the user cares about — e.g., "the .docx file", "the final CSV">
+- Stage marks: <workspace>/iteration-<N>/stages.json lists the stages. As you work, append a mark when each one begins and ends to <run-dir>/stages.jsonl, with
+  python3 -c 'import time,json;print(json.dumps({"stage":"<name>","event":"start","t":time.time()}))' >> <run-dir>/stages.jsonl
+  (event "end" when it finishes; stages may repeat). Marking is bookkeeping only: don't change how you work because of it, and don't stop if a mark is missed.
 ```
 
 **Baseline run** (same prompt, but the baseline depends on context):
@@ -239,6 +250,8 @@ When each subagent task completes, you receive a notification containing `total_
 
 This is the only opportunity to capture this data — it comes through the task notification and isn't persisted elsewhere. Process each notification as it arrives rather than trying to batch them.
 
+The per-stage marks the run wrote to `stages.jsonl` stay in the run directory as they are; `timing.json`'s total is what lets the script show time that no stage accounts for. Missing or unbalanced marks are fine: the aggregation reports them as gaps instead of failing.
+
 ### Step 4: Grade, aggregate, and launch the viewer
 
 Once all runs are done:
@@ -249,7 +262,7 @@ Once all runs are done:
    ```bash
    python -m scripts.aggregate_benchmark <workspace>/iteration-N --skill-name <name>
    ```
-   This produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, with mean ± stddev and the delta. If generating benchmark.json manually, see `references/schemas.md` for the exact schema the viewer expects.
+   This produces `benchmark.json` and `benchmark.md` with pass_rate, time, and tokens for each configuration, with mean ± stddev and the delta. When runs have `stages.jsonl`, it also writes each run's `stage_timing.json`, adds a stage table to `benchmark.md` and a `stage_timing` section to `benchmark.json`, and writes `<workspace>/iteration-N/waterfall.svg` (a standalone chart that opens in any browser or image viewer). `python -m scripts.stage_timing <workspace>/iteration-N` redoes just the stage part. If generating benchmark.json manually, see `references/schemas.md` for the exact schema the viewer expects.
 Put each with_skill version before its baseline counterpart.
 
 3. **Do an analyst pass** — read the benchmark data and surface patterns the aggregate stats might hide. See `agents/analyzer.md` (the "Analyzing Benchmark Results" section) for what to look for — things like assertions that always pass regardless of skill (non-discriminating), high-variance evals (possibly flaky), and time/token tradeoffs. Add your notes to the `notes` list in `benchmark.json`, after any notes the script already wrote there; don't replace those.
@@ -281,7 +294,7 @@ The "Outputs" tab shows one test case at a time:
 - **Feedback**: a textbox that auto-saves as they type
 - **Previous Feedback** (iteration 2+): their comments from last time, shown below the textbox
 
-The "Benchmark" tab shows the stats summary: pass rates, timing, and token usage for each configuration, with per-eval breakdowns and analyst observations.
+The "Benchmark" tab shows the stats summary: pass rates, timing, and token usage for each configuration, with per-eval breakdowns and analyst observations. When stage marks exist it also shows a stage duration waterfall: one bar per stage, placed at its mean start time, one panel per configuration plus the previous iteration's, and a table of mean seconds per stage with the change since the previous iteration. Without a browser, show the user `waterfall.svg` and the stage table in `benchmark.md` instead.
 
 Navigation is via prev/next buttons or arrow keys. When done, they click "Submit All Reviews" which saves all feedback to `feedback.json`.
 
@@ -324,6 +337,8 @@ This is the heart of the loop. You've run the test cases, the user has reviewed 
 
 4. **Look for repeated work across test cases.** Read the transcripts from the test runs and notice if the subagents all independently wrote similar helper scripts or took the same multi-step approach to something. If all 3 test cases resulted in the subagent writing a `create_docx.py` or a `build_chart.py`, that's a strong signal the skill should bundle that script. Write it once, put it in `scripts/`, and tell the skill to use it. This saves every future invocation from reinventing the wheel.
 
+5. **Improve duration too, after score.** Read the stage table and waterfall in the benchmark (and the analyzer's stage notes). Take the slowest stages first, open the transcripts of those stages, and find what the time went on: reading files the task doesn't need, retries, a script that could be bundled, instructions that make the model do extra passes. Propose a change for the stage, not for the total. Score comes first: a change is kept only if the pass rate does not drop, and only then is the duration judged. Stage timings vary from run to run, so with few runs call a duration change real only when it is larger than the run-to-run stddev shown in the table; otherwise say it is within noise and don't claim a gain.
+
 This task is pretty important (we are trying to create billions a year in economic value here!) and your thinking time is not the blocker; take your time and really mull things over. I'd suggest writing a draft revision and then looking at it anew and making improvements. Really do your best to get into the head of the user and understand what they want and need.
 
 ### The iteration loop
@@ -335,6 +350,8 @@ After improving the skill:
 3. Launch the reviewer with `--previous-workspace` pointing at the previous iteration
 4. Wait for the user to review and tell you they're done
 5. Read the new feedback, improve again, repeat
+
+At the end of each iteration, report the change since the previous iteration with pass rate and duration side by side: pass rate delta, total duration delta, and the per-stage duration deltas (mark each as beyond or within the stddev). If the pass rate dropped, revert or rework the change however much faster it got.
 
 Keep going until:
 - The user says they're happy
@@ -446,7 +463,7 @@ In Claude.ai, the core workflow is the same (draft → test → review → impro
 
 **Reviewing results**: If you can't open a browser (e.g., Claude.ai's VM has no display, or you're on a remote server), skip the browser reviewer entirely. Instead, present results directly in the conversation. For each test case, show the prompt and the output. If the output is a file the user needs to see (like a .docx or .xlsx), save it to the filesystem and tell them where it is so they can download and inspect it. Ask for feedback inline: "How does this look? Anything you'd change?"
 
-**Benchmarking**: Skip the quantitative benchmarking — it relies on baseline comparisons which aren't meaningful without subagents. Focus on qualitative feedback from the user.
+**Benchmarking**: Skip the quantitative benchmarking — it relies on baseline comparisons which aren't meaningful without subagents. Stage timing needs the same subagent runs, so skip it too. Focus on qualitative feedback from the user.
 
 **The iteration loop**: Same as before — improve the skill, rerun the test cases, ask for feedback — just without the browser reviewer in the middle. You can still organize results into iteration directories on the filesystem if you have one.
 
