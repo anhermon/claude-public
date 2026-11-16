@@ -1,0 +1,10 @@
+{"stage": "read-readme", "event": "start", "t": 1794835116.004199}
+{"stage": "read-readme", "event": "end", "t": 1794835120.76859}
+{"stage": "collect-stats", "event": "start", "t": 1794835124.168622}
+{"stage": "collect-stats", "event": "end", "t": 1794835135.574434}
+{"stage": "write-observations", "event": "start", "t": 1794835158.138319}
+{"stage": "write-observations", "event": "end", "t": 1794835164.301288}
+{"stage": "write-report", "event": "start", "t": 1794835168.970308}
+{"stage": "write-report", "event": "end", "t": 1794835175.9515982}
+{"stage": "check-report", "event": "start", "t": 1794835190.800339}
+{"stage": "check-report", "event": "end", "t": 1794835204.871052}

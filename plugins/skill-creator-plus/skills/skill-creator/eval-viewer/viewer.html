@@ -426,6 +426,7 @@
     .stage-chart-scroll { overflow-x: auto; }
     .stage-chart-scroll svg { display: block; min-width: 640px; } /* 1:1 with the SVG viewBox, so labels stay 11px and narrow screens scroll */
     .stage-chart .benchmark-table { margin-top: 1rem; margin-bottom: 0; }
+    .stage-chart .stage-split, .stage-chart .stage-source { color: var(--text-muted); font-size: 0.8125rem; }
     .benchmark-empty {
       color: var(--text-muted);
       font-style: italic;
@@ -1338,6 +1339,16 @@
           const row = ((st.configurations[cfg] || {}).stages || {})[name];
           return row ? row.duration_seconds.mean : null;
         };
+        // From a transcript each stage also has its model time (thinking, writing tool input) and tool time
+        const stageSplit = (cfg, name) => {
+          const row = ((st.configurations[cfg] || {}).stages || {})[name];
+          if (!row || !row.model_seconds || !row.tool_seconds) return "";
+          return ' <span class="stage-split">(model ' + row.model_seconds.mean.toFixed(1) + " / tool " + row.tool_seconds.mean.toFixed(1) + ")</span>";
+        };
+        const configStat = (cfg, key) => {
+          const stat = (st.configurations[cfg] || {})[key];
+          return stat ? stat.mean.toFixed(1) : "—";
+        };
         html += '<div class="stage-chart-scroll"><table class="benchmark-table"><thead><tr><th>Stage</th>';
         for (const cfg of stConfigs) html += "<th>" + escapeHtml(cfg.replace(/_/g, " ")) + " (s)</th>";
         if (prevStages) html += "<th>Previous (s)</th><th>Change</th>";
@@ -1346,7 +1357,7 @@
           html += "<tr><td>" + escapeHtml(stage.name) + "</td>";
           for (const cfg of stConfigs) {
             const m = stageMean(cfg, stage.name);
-            html += "<td>" + (m === null ? "—" : m.toFixed(1)) + "</td>";
+            html += "<td>" + (m === null ? "—" : m.toFixed(1) + stageSplit(cfg, stage.name)) + "</td>";
           }
           if (prevStages) {
             const prev = prevStages[stage.name] ? prevStages[stage.name].duration_seconds.mean : null;
@@ -1362,7 +1373,18 @@
           }
           html += "</tr>";
         }
-        html += "</tbody></table></div></div>";
+        const timed = stConfigs.some((cfg) => (st.configurations[cfg] || {}).startup_seconds);
+        for (const [label, key] of timed ? [["startup", "startup_seconds"], ["handback", "handback_seconds"], ["unattributed", "unaccounted_seconds"]] : [["unaccounted", "unaccounted_seconds"]]) {
+          html += "<tr><td>" + label + "</td>";
+          for (const cfg of stConfigs) html += "<td>" + configStat(cfg, key) + "</td>";
+          if (prevStages) html += "<td></td><td></td>";
+          html += "</tr>";
+        }
+        html += "</tbody></table></div>";
+        const marksOnly = stConfigs.filter((cfg) => (st.configurations[cfg] || {}).source !== "transcript");
+        html += '<p class="stage-source">' + (marksOnly.length
+          ? "Shell-only marks: model time not attributed (" + escapeHtml(marksOnly.join(", ")) + ")."
+          : "Timing comes from the executor transcript: stage time + startup + handback + unattributed = wall time.") + "</p></div>";
       }
 
       // Notes

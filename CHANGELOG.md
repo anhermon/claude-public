@@ -16,6 +16,7 @@
 
 ### Added
 
+- **skill-creator-plus 0.3.0**: stage timing now comes from the executor's transcript, so the waterfall shows where wall time really goes. Model time (thinking and writing tool input) and tool time are split per stage and shown as stacked bars with output tokens; startup, handback and unattributed time are explicit and reconcile with the transcript's wall time (checked in code). Executors declare stages for free with a `# stage: <name>` first line in a Bash command (or a `stage: <name>` text line before other tools) instead of running `python3 -c` marks, which added about 3s each and ignored model time. `timing.json` records `agent_id` / `transcript_path`; `stages.jsonl` remains a fallback labelled "shell-only marks: model time not attributed".
 - `scripts/validate.sh`: validates the marketplace and all plugins.
 - **skill-creator-plus 0.2.0**: Anthropic's `skill-creator` skill (claude.ai-synced copy) as a pristine `upstream/` copy plus a locally extensible `skills/` copy, resynced with `scripts/sync-upstream.sh`. Evals measure duration per stage of the tested skill: `iteration-N/stages.json`, per-run `stages.jsonl` marks, `scripts/stage_timing.py`, a stage table in the benchmark, a waterfall chart in the viewer (with the previous iteration) and a standalone `waterfall.svg`. The improve loop and analyzer use stage timings, score first, duration second. Apache-2.0, credited to Anthropic.
 
