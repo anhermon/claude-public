@@ -1354,10 +1354,13 @@
         if (prevStages) html += "<th>Previous (s)</th><th>Change</th>";
         html += "</tr></thead><tbody>";
         for (const stage of st.stages || []) {
-          html += "<tr><td>" + escapeHtml(stage.name) + "</td>";
+          const flag = stage.in_stages_json === false ? ' <span class="stage-split">(not in stages.json)</span>' : "";
+          html += "<tr><td>" + escapeHtml(stage.name) + flag + "</td>";
           for (const cfg of stConfigs) {
             const m = stageMean(cfg, stage.name);
-            html += "<td>" + (m === null ? "—" : m.toFixed(1) + stageSplit(cfg, stage.name)) + "</td>";
+            const row = ((st.configurations[cfg] || {}).stages || {})[stage.name];
+            const n = row ? ' <span class="stage-split">n=' + row.runs + " of " + st.configurations[cfg].runs + "</span>" : "";
+            html += "<td>" + (m === null ? "—" : (row.per_run_seconds === undefined ? m : row.per_run_seconds).toFixed(1) + n + stageSplit(cfg, stage.name)) + "</td>";
           }
           if (prevStages) {
             const prev = prevStages[stage.name] ? prevStages[stage.name].duration_seconds.mean : null;
@@ -1380,6 +1383,14 @@
           if (prevStages) html += "<td></td><td></td>";
           html += "</tr>";
         }
+        const wall = (cfg) => configStat(cfg, "total_seconds");
+        html += "<tr><td>total</td>";
+        for (const cfg of stConfigs) {
+          const note = (st.configurations[cfg] || {}).notification_seconds;
+          html += "<td>" + wall(cfg) + ' <span class="stage-split">transcript wall' + (note ? "; notification duration " + note.mean.toFixed(1) : "") + "</span></td>";
+        }
+        if (prevStages) html += "<td></td><td></td>";
+        html += "</tr>";
         html += "</tbody></table></div>";
         const marksOnly = stConfigs.filter((cfg) => (st.configurations[cfg] || {}).source !== "transcript");
         html += '<p class="stage-source">' + (marksOnly.length

@@ -669,6 +669,7 @@ def analyze_run(run_dir: Path, known_stages: list[str]):
             try:
                 result = compute_transcript_run(lines, marks, known_stages, gaps)
                 result["transcript"] = transcript.name
+                result["notification_seconds"] = total_seconds_of(run_dir)
                 return result
             except ValueError as e:
                 note.append(f"transcript {transcript.name} gave inconsistent timing ({e}), so the marks are used")
@@ -694,12 +695,14 @@ def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[d
     run_counts maps it to the number of runs it has in total.
     """
     known = [d["name"] for d in definitions]
-    order = list(known)
+    # Every stage that has time, in the order it was first seen; listed-but-unused stages are left out
+    order = []
     for runs in per_config.values():
         for _, result in runs:
             for stage in result["stages"]:
-                if stage["name"] not in order:
+                if stage["name"] not in order and stage["duration_seconds"] is not None:
                     order.append(stage["name"])
+    descriptions = {d["name"]: d["description"] for d in definitions}
 
     configurations = {}
     gaps = []
@@ -712,6 +715,8 @@ def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[d
                     "duration_seconds": calculate_stats([s["duration_seconds"] for s in rows]),
                     "start_offset_seconds": calculate_stats([s["start_offset_seconds"] for s in rows]),
                     "runs": len(rows),
+                    # Seconds this stage adds to an average run (a run without it counts 0), so the rows add up to the total
+                    "per_run_seconds": round(sum(s["duration_seconds"] for s in rows) / len(runs), 4),
                 }
                 for key in ("model_seconds", "tool_seconds", "output_tokens"):
                     stat = stats_of(rows, key)
@@ -730,15 +735,19 @@ def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[d
             "startup_seconds": stats_of(results, "startup_seconds"),
             "handback_seconds": stats_of(results, "handback_seconds"),
             "unaccounted_seconds": calculate_stats(unaccounted) if unaccounted else None,
+            "notification_seconds": stats_of(results, "notification_seconds"),
         }
         for label, result in runs:
             gaps.extend({"run": label, "issue": g} for g in result["gaps"])
         if len(runs) < run_counts.get(config, len(runs)):
             gaps.append({"run": config, "issue": f"only {len(runs)} of {run_counts[config]} runs have a transcript or {MARKS_FILE}"})
+    for name in order:
+        if known and name not in known:
+            gaps.append({"run": "all", "issue": f"stage {name} is not in {STAGES_FILE}; the executor used a name that was not allowed"})
     kinds = {c["source"] for c in configurations.values()}
     return {
         "source": kinds.pop() if len(kinds) == 1 else "mixed",
-        "stages": definitions or [{"name": n, "description": ""} for n in order],
+        "stages": [{"name": n, "description": descriptions.get(n, ""), "in_stages_json": n in known or not known} for n in order],
         "configurations": configurations,
         "gaps": gaps,
     }
@@ -788,6 +797,7 @@ svg.wf .grid { stroke: var(--wf-grid); stroke-width: 1; }
 svg.wf .gap { fill: none; stroke: var(--wf-muted); stroke-dasharray: 3 2; }
 svg.wf .seg-model { fill: #5c6bc0; }
 svg.wf .seg-tool { fill: #26a69a; }
+svg.wf .seg-idle { fill: var(--wf-muted); opacity: 0.55; }
 """.strip()
 
 # A standalone file has no page around it, so it follows the reader's colour scheme itself
@@ -839,6 +849,8 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
     names = [s["name"] for s in stage_timing.get("stages", [])]
     for panel in panels:
         names += [n for n in panel["data"].get("stages", {}) if n not in names]
+    off_list = {s["name"] for s in stage_timing.get("stages", []) if s.get("in_stages_json") is False}
+    overhead = ["startup", "handback"] if any(has_split(p["data"]) for p in panels) else []
 
     width, label_w, right_pad, top_pad = 640, 118, 96, 8
     row_h, axis_h, panel_gap = 20, 20, 12
@@ -861,7 +873,8 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
     def x_of(seconds: float) -> float:
         return label_w + plot_w * seconds / axis_max
 
-    panel_h = title_h + row_h * len(names) + axis_h
+    names_all = names + overhead
+    panel_h = title_h + row_h * len(names_all) + axis_h
     height = top_pad + legend_h + max(len(panels), 1) * (panel_h + panel_gap)
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" class="wf{" wf-standalone" if standalone else ""}" '
@@ -883,6 +896,9 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
                 x += 14 + 6 * len(label) + 12
         if any_marks:
             parts.append(f'<text class="muted" x="{x}" y="9">{escape(MARKS_LABEL if any_split else "Chart note: " + MARKS_LABEL)}</text>')
+            x += 6 * len(MARKS_LABEL) + 12
+        if off_list:
+            parts.append(f'<text class="muted" x="{x}" y="9">* not in stages.json</text>')
         parts.append("</g>")
 
     for p_index, panel in enumerate(panels):
@@ -894,7 +910,7 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
         unaccounted = (data.get("unaccounted_seconds") or {}).get("mean")
         title = f"{panel['label']} ({data.get('runs', 0)} of {data.get('runs_total', data.get('runs', 0))} runs timed)"
         if total is not None:
-            title += f" - total {total:.1f}s"
+            title += f" - {'transcript wall' if split else 'total'} {total:.1f}s"
         if unaccounted is not None and not split:
             title += f", unaccounted {unaccounted:.1f}s"
         parts.append(f'<text class="title" x="0" y="{y0 + 14}">{escape(title)}</text>')
@@ -904,18 +920,32 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
                 value = (data.get(key) or {}).get("mean")
                 if value is not None:
                     extra.append(f"{label} {value:.1f}s")
+            notified = (data.get("notification_seconds") or {}).get("mean")
+            if notified is not None and total is not None and abs(notified - total) > 0.05:
+                extra.append(f"notification duration {notified:.1f}s")
             parts.append(f'<text class="muted" x="0" y="{y0 + 29}">{escape(" · ".join(extra))}</text>')
         rows_top = y0 + title_h
         # Grid lines and axis labels
         tick = 0.0
         while tick <= axis_max + 1e-9:
             x = x_of(tick)
-            parts.append(f'<line class="grid" x1="{x:.1f}" y1="{rows_top}" x2="{x:.1f}" y2="{rows_top + row_h * len(names)}"/>')
-            parts.append(f'<text class="muted" x="{x:.1f}" y="{rows_top + row_h * len(names) + 13}" text-anchor="middle">{tick:g}s</text>')
+            parts.append(f'<line class="grid" x1="{x:.1f}" y1="{rows_top}" x2="{x:.1f}" y2="{rows_top + row_h * len(names_all)}"/>')
+            parts.append(f'<text class="muted" x="{x:.1f}" y="{rows_top + row_h * len(names_all) + 13}" text-anchor="middle">{tick:g}s</text>')
             tick += step
-        for r_index, name in enumerate(names):
+        for r_index, name in enumerate(names_all):
             y = rows_top + r_index * row_h
-            parts.append(f'<text x="{label_w - 6}" y="{y + 14}" text-anchor="end">{escape(name)}</text>')
+            if name in overhead:
+                seconds = (data.get(f"{name}_seconds") or {}).get("mean")
+                parts.append(f'<text class="muted" x="{label_w - 6}" y="{y + 14}" text-anchor="end">{name}</text>')
+                if seconds is None:
+                    parts.append(f'<text class="muted" x="{label_w + 4}" y="{y + 14}">no data</text>')
+                else:
+                    begin = 0.0 if name == "startup" else max((total or 0.0) - seconds, 0.0)
+                    w = max(plot_w * seconds / axis_max, 1.5)
+                    parts.append(f'<rect class="seg-idle" x="{x_of(begin):.1f}" y="{y + 3}" width="{w:.1f}" height="{row_h - 6}" rx="2"><title>{name}: {seconds:.1f}s, not part of any stage</title></rect>')
+                    parts.append(f'<text class="muted" x="{x_of(begin) + w + 4:.1f}" y="{y + 14}">{seconds:.1f}s</text>')
+                continue
+            parts.append(f'<text x="{label_w - 6}" y="{y + 14}" text-anchor="end">{escape(name)}{"*" if name in off_list else ""}</text>')
             stage = data.get("stages", {}).get(name)
             if not stage:
                 parts.append(f'<text class="muted" x="{label_w + 4}" y="{y + 14}">no data</text>')
@@ -982,9 +1012,13 @@ def write_artifacts(iteration_dir: Path, stage_timing: dict, previous_dir: Path 
 
 
 def markdown_table(stage_timing: dict) -> str:
-    """The stage table for benchmark.md: one column per configuration, mean ± stddev in seconds."""
+    """
+    The stage table for benchmark.md: one column per configuration, every stage that has
+    time (first-seen order, off-list names flagged), n per stage and a total row.
+    """
     configs = list(stage_timing["configurations"])
-    split = any("model_seconds" in r for c in stage_timing["configurations"].values() for r in c["stages"].values())
+    cfgs = stage_timing["configurations"]
+    split = any("model_seconds" in r for c in cfgs.values() for r in c["stages"].values())
     lines = [
         "## Stage Timing",
         "",
@@ -998,26 +1032,48 @@ def markdown_table(stage_timing: dict) -> str:
     for stage in stage_timing["stages"]:
         cells = []
         for config in configs:
-            row = stage_timing["configurations"][config]["stages"].get(stage["name"])
-            text = cell(row["duration_seconds"]) if row else "—"
-            if row and "model_seconds" in row and "tool_seconds" in row:
-                text += f" (model {row['model_seconds']['mean']:.1f}s / tool {row['tool_seconds']['mean']:.1f}s"
+            data = cfgs[config]
+            row = data["stages"].get(stage["name"])
+            if not row:
+                cells.append("—")
+                continue
+            per_run = row.get("per_run_seconds", row["duration_seconds"]["mean"])
+            text = f"{per_run:.1f}s per run (n={row['runs']} of {data['runs']}; {cell(row['duration_seconds'])} when present"
+            if "model_seconds" in row and "tool_seconds" in row:
+                text += f"; model {row['model_seconds']['mean']:.1f}s / tool {row['tool_seconds']['mean']:.1f}s"
                 tokens = (row.get("output_tokens") or {}).get("mean")
-                text += f", {tokens:.0f} tokens)" if tokens else ")"
-            cells.append(text)
-        lines.append(f"| {stage['name']} | " + " | ".join(cells) + " |")
+                text += f", {tokens:.0f} tokens" if tokens else ""
+            cells.append(text + ")")
+        flag = "" if stage.get("in_stages_json", True) else " *(not in stages.json)*"
+        lines.append(f"| {stage['name']}{flag} | " + " | ".join(cells) + " |")
     extra = [("startup", "startup_seconds"), ("handback", "handback_seconds")] if split else []
     for label, key in extra:
-        lines.append(f"| {label} | " + " | ".join(cell(stage_timing["configurations"][c].get(key)) for c in configs) + " |")
-    lines.append(f"| {'unattributed' if split else 'unaccounted'} | " + " | ".join(cell(stage_timing["configurations"][c]["unaccounted_seconds"]) for c in configs) + " |")
-    counts = ", ".join(f"{c}: {d['runs']} of {d['runs_total']}" for c, d in stage_timing["configurations"].items())
-    lines.extend(["", f"Runs with timing: {counts}."])
-    sources = {c: d.get("source", "marks") for c, d in stage_timing["configurations"].items()}
+        lines.append(f"| {label} | " + " | ".join(cell(cfgs[c].get(key)) for c in configs) + " |")
+    lines.append(f"| {'unattributed' if split else 'unaccounted'} | " + " | ".join(cell(cfgs[c]["unaccounted_seconds"]) for c in configs) + " |")
+    lines.append(f"| total{' (transcript wall)' if split else ''} | " + " | ".join(cell(cfgs[c]["total_seconds"]) for c in configs) + " |")
+    lines.append("")
+    for config in configs:
+        data = cfgs[config]
+        total = (data["total_seconds"] or {}).get("mean")
+        if total is None or data.get("source") != "transcript":
+            continue
+        rows = sum(r.get("per_run_seconds", 0.0) for r in data["stages"].values())
+        rows += sum((data.get(k) or {"mean": 0.0})["mean"] for k in ("startup_seconds", "handback_seconds", "unaccounted_seconds"))
+        verdict = "rows add up to" if abs(rows - total) <= 0.05 else f"rows add up to {rows:.1f}s, which differs from"
+        lines.append(f"{config.replace('_', ' ').title()}: stage rows (per run) + startup + handback + unattributed: {verdict} {total:.1f}s = mean transcript wall time.")
+        notified = data.get("notification_seconds")
+        if notified and abs(notified["mean"] - total) > 0.05:
+            lines.append(f"{config.replace('_', ' ').title()}: notification duration (duration_ms from the task notification, the Time row above) is {notified['mean']:.1f}s; transcript wall is {total:.1f}s. This table uses transcript wall time.")
+    counts = ", ".join(f"{c}: {d['runs']} of {d['runs_total']}" for c, d in cfgs.items())
+    lines.extend(["", f"Runs with timing: {counts}. Per-stage n counts the runs in which the stage appears."])
+    sources = {c: d.get("source", "marks") for c, d in cfgs.items()}
     if all(v == "transcript" for v in sources.values()):
-        lines.append("Source: executor transcript timestamps. Stage time + startup + handback + unattributed = transcript wall time.")
+        lines.append("Source: executor transcript timestamps.")
     else:
         flagged = ", ".join(c for c, v in sources.items() if v != "transcript")
         lines.append(f"Source for {flagged}: {MARKS_LABEL}.")
+    if any(not x.get("in_stages_json", True) for x in stage_timing["stages"]):
+        lines.append("Stages marked *(not in stages.json)* were declared by the executor under a name the iteration did not list.")
     if stage_timing["gaps"]:
         lines.extend(["", f"{len(stage_timing['gaps'])} gap(s) in the timing input; see stage_timing.json."])
     return "\n".join(lines)
