@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **skill-creator-plus plugin (0.1.0)** — Anthropic's `skill-creator` skill from the claude.ai-synced copy (the GitHub copy is frozen at March 2026), kept as a pristine `upstream/` copy plus a locally extensible `skills/` copy. `scripts/sync-upstream.sh` resyncs upstream and 3-way merges the delta into `skills/`. Apache-2.0, credited to Anthropic.
+
 ## [0.2.3] — 2026-04-07
 
 ### Fixed

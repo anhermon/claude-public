@@ -202,6 +202,20 @@
         "path": "plugins/observability",
         "ref": "main"
       }
+    },
+    {
+      "name": "skill-creator-plus",
+      "description": "Anthropic's skill-creator skill (claude.ai-shipped version) with local extensions and a repeatable resync from upstream.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/skill-creator-plus",
+        "ref": "main"
+      }
     }
   ]
 }

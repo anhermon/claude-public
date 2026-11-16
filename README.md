@@ -41,6 +41,9 @@ claude install anhermon/claude-public/commit.plugin
 
 ## Plugin catalog
 
+### skill-creator-plus
+**v0.1.0** — Anthropic's skill-creator (claude.ai-shipped version) with local extensions and a repeatable resync from upstream. See [plugins/skill-creator-plus/README.md](./plugins/skill-creator-plus/README.md).
+
 ### commit
 **v1.0.0** — Write and execute a conventional commit automatically.
 
