@@ -16,6 +16,7 @@ claude plugin install <plugin>@claude-public
 | [research](plugins/research) | 1.0.0 | research | Research a topic as a fast web-backed brief, or drive an AutoResearchClaw run that ends in a paper. |
 | [agent-repo-search](plugins/agent-repo-search) | 0.1.0 | development | Ingest a large repo with `rendergit` and read only the index and the chunks you need. |
 | [context-os](plugins/context-os) | 2.2.0 | development | Session and token analytics (cc-lens, ccusage), token-efficiency playbook, local knowledge graph. |
+| [skill-creator-plus](plugins/skill-creator-plus) | 0.2.0 | development | Anthropic's skill-creator (claude.ai version) plus per-stage timing and a duration waterfall in evals; resyncs from upstream. |
 
 ## What belongs here
 

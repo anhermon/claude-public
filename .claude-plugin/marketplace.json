@@ -4,7 +4,7 @@
     "name": "Angel Hermon"
   },
   "metadata": {
-    "description": "Public Claude Code plugins: premium-web page building, an LLM-maintained markdown wiki, topic research, token-efficient repo ingestion and session context analytics"
+    "description": "Public Claude Code plugins: premium-web page building, an LLM-maintained markdown wiki, topic research, token-efficient repo ingestion, session context analytics and a skill-creator with stage timing"
   },
   "plugins": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "name": "llm-wiki",
-      "description": "Persistent markdown wiki maintenance — INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/. Includes kb-to-wiki skill for publishing the KB as a browsable HTML wiki.",
+      "description": "Persistent markdown wiki maintenance \u2014 INGEST sources, QUERY with citations, LINT for drift, LEARNINGS capture. Vault at ~/knowledge-base/. Includes kb-to-wiki skill for publishing the KB as a browsable HTML wiki.",
       "version": "1.1.0",
       "author": {
         "name": "Angel Hermon"
@@ -39,7 +39,7 @@
     },
     {
       "name": "research",
-      "description": "Research a topic via AutoResearchClaw (full 23-stage pipeline → paper) or Regular Research (fast Claude synthesis).",
+      "description": "Research a topic via AutoResearchClaw (full 23-stage pipeline \u2192 paper) or Regular Research (fast Claude synthesis).",
       "version": "1.0.0",
       "author": {
         "name": "Angel Hermon"
@@ -81,6 +81,21 @@
         "ref": "main"
       },
       "category": "design"
+    },
+    {
+      "name": "skill-creator-plus",
+      "description": "Anthropic's skill-creator skill (claude.ai-shipped version) with per-stage timing, a duration waterfall and a repeatable resync from upstream.",
+      "version": "0.2.0",
+      "author": {
+        "name": "Angel Hermon"
+      },
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/anhermon/claude-public.git",
+        "path": "plugins/skill-creator-plus",
+        "ref": "main"
+      },
+      "category": "development"
     }
   ]
 }
