@@ -319,9 +319,22 @@ The stages of the skill under test, written once per iteration at `<workspace>/i
 
 ---
 
+## Stage markers and the transcript
+
+The executor declares stages inside the tool calls it makes, at no cost: a Bash command starts with the comment line `# stage: collect-stats`; any other tool call is preceded by a text line `stage: collect-stats`; `# stage: end` / `stage: end` marks the end of the last stage. A stage lasts until the next declaration. `scripts/stage_timing.py` reads these from the executor's transcript (JSONL, one message per line, each with an ISO `timestamp`) and splits the wall time into intervals:
+
+- model time: from the previous tool result (or the prompt) to the assistant message, which is thinking plus writing the tool input; split over the stages a message declares in proportion to the text written for each;
+- tool time: from the assistant message to its tool result;
+- startup (before the first stage), handback (after the last), and unattributed (a tool call with no result);
+- host stall: an idle gap between consecutive transcript events longer than 120 seconds (`--stall-threshold`) that overlaps a long gap in at least one other run of the iteration (any configuration). Overlap across independent runs means the cause is outside the skill (a frozen host or harness), so that time is taken out of the stage and booked to `host stall`. A long gap in only one run stays in its stage and is listed in `gaps` as "long single-run gap".
+
+`timing.json` points at the transcript with `transcript_path` (absolute, or relative to the run directory) and/or `agent_id` (looked up under `~/.claude/projects/*/*/subagents/agent-<id>.jsonl`); a `transcript.jsonl` in the run directory is used when neither is set. Marks from older runs (`m <name> start` helper calls or `{"stage": ..., "event": "start"}` lines inside a tool input) still count as declarations; when `stages.jsonl` timestamps exist they only decide how a batched command is split.
+
+---
+
 ## stages.jsonl
 
-Stage boundary marks, one JSON object per line, appended by the executor to `<run-dir>/stages.jsonl` while it works.
+Legacy and claude.ai fallback, used only when a run has no transcript; its chart is labelled "shell-only marks: model time not attributed". Stage boundary marks, one JSON object per line, appended by the executor to `<run-dir>/stages.jsonl` while it works.
 
 ```jsonl
 {"stage": "read-input", "event": "start", "t": 1768473000.12}
@@ -355,7 +368,8 @@ Written by `scripts/stage_timing.py` (called from `aggregate_benchmark.py`), in 
 }
 ```
 
-- `start_offset_seconds` is relative to the run's earliest valid start mark. `duration_seconds` and `start_offset_seconds` are `null` for a stage with no complete start/end pair.
+- From a transcript the result also has `"source": "transcript"`, and each stage has `model_seconds`, `tool_seconds` (they add up to `duration_seconds`) and `output_tokens` (when the transcript carries usage); the run has `wall_seconds` (the transcript's first to last timestamp, also `total_seconds`), `startup_seconds`, `handback_seconds`, `host_stall_seconds`, `stalls` (a list of `{"start", "end", "seconds", "shared_with_runs"}`, ISO UTC times, `shared_with_runs` counting the other runs whose gap overlaps) and `unattributed_seconds` (also `unaccounted_seconds`). `stages` + `startup` + `handback` + `host stall` + `unattributed` equal `wall_seconds` within one second; this is checked when the file is written. From `stages.jsonl` the result has `"source": "marks"` and none of those.
+- `start_offset_seconds` is relative to the run's earliest valid start mark (transcript: the run's first timestamp). `duration_seconds` and `start_offset_seconds` are `null` for a stage with no complete start/end pair.
 - `total_seconds` comes from the run's `timing.json` (`total_duration_seconds`, else `duration_ms` / 1000), `null` when absent. `unaccounted_seconds` is the total minus `accounted_seconds` (never below 0), `null` when there is no total.
 - `gaps`: plain-text sentences, one per problem found in the marks.
 
@@ -368,23 +382,32 @@ Written by `scripts/stage_timing.py` (called from `aggregate_benchmark.py`), in 
     "with_skill": {
       "runs": 3,
       "runs_total": 3,
+      "source": "transcript",
       "stages": {
         "read-input": {
           "duration_seconds": {"mean": 11.0, "stddev": 1.2, "min": 10.0, "max": 12.4},
+          "model_seconds": {"mean": 4.0, "stddev": 0.5, "min": 3.5, "max": 4.6},
+          "tool_seconds": {"mean": 7.0, "stddev": 0.9, "min": 6.2, "max": 7.8},
+          "output_tokens": {"mean": 310.0, "stddev": 20.0, "min": 290.0, "max": 335.0},
           "start_offset_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
           "runs": 3
         }
       },
       "total_seconds": {"mean": 45.0, "stddev": 2.0, "min": 43.0, "max": 47.0},
+      "startup_seconds": {"mean": 4.0, "stddev": 0.3, "min": 3.7, "max": 4.3},
+      "handback_seconds": {"mean": 2.0, "stddev": 0.2, "min": 1.8, "max": 2.2},
+      "host_stall_seconds": {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0},
       "unaccounted_seconds": {"mean": 3.7, "stddev": 0.5, "min": 3.2, "max": 4.2}
     }
   },
+  "host_stalls": [],
   "gaps": [{"run": "case-one/with_skill/run-2", "issue": "stage build-report has no end mark, so its duration is unknown and left out"}]
 }
 ```
 
-- `runs` counts the runs with a `stages.jsonl`, `runs_total` all runs of that configuration. Only runs with a complete interval for a stage count toward that stage's stats (`stages.<name>.runs`).
-- The section is absent from `benchmark.json` when no run has a `stages.jsonl`.
+- `source` is `transcript`, `marks` (shell-only marks) or `mixed`, per configuration and, as a top-level field, for the whole section. `model_seconds`, `tool_seconds`, `output_tokens`, `startup_seconds`, `handback_seconds` and `host_stall_seconds` appear only for transcript runs; `host_stalls` lists the distinct stall intervals across runs (`start`, `end`, `seconds`, `runs` = how many runs share it); `unaccounted_seconds` is the unattributed time for them.
+- `runs` counts the runs with a transcript or a `stages.jsonl`, `runs_total` all runs of that configuration. Only runs with a complete interval for a stage count toward that stage's stats (`stages.<name>.runs`).
+- The section is absent from `benchmark.json` when no run has a transcript or a `stages.jsonl`.
 - `<workspace>/iteration-N/waterfall.svg` is the standalone chart of the same means, with the previous iteration (`iteration-(N-1)/stage_timing.json`) as an extra panel when it exists. The viewer's Benchmark tab shows the same chart.
 
 ---

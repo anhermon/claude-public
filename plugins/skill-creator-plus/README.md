@@ -37,7 +37,7 @@ claude.ai account skills sync into `~/.claude/skills/synced/<id>/skill-creator`.
 Evals measure duration per stage as well as pass rate, and the improve loop uses both (score first, duration second).
 
 1. The skill's stages are listed once per iteration in `iteration-N/stages.json`.
-2. Each run appends start/end marks to `<run>/stages.jsonl`. Missing or unbalanced marks are reported as gaps, never as errors.
+2. Timing is read from each executor's transcript (timestamps on every line). The executor declares its stage for free with a `# stage: <name>` first line in a Bash command, or a `stage: <name>` text line before other tools; only names from `stages.json` (plus `other`) are allowed, and any other name is still shown, flagged. Model time and tool time are split per stage, and stages + startup + handback + unattributed reconcile with the transcript's wall time. `timing.json` carries `agent_id` / `transcript_path`. Without a transcript (claude.ai) `<run>/stages.jsonl` shell marks are the fallback and the chart says so. Missing input is reported as gaps, never as errors.
 3. `python -m scripts.aggregate_benchmark <iteration-dir>` (or `python -m scripts.stage_timing <iteration-dir>` alone, run from `skills/skill-creator/`) writes `stage_timing.json` per run and per iteration, a stage table in `benchmark.md`, and `waterfall.svg`.
 4. The viewer's Benchmark tab shows the waterfall: one panel per configuration plus the previous iteration. Without a browser, open `waterfall.svg`.
 

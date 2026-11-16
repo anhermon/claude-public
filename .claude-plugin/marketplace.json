@@ -85,7 +85,7 @@
     {
       "name": "skill-creator-plus",
       "description": "Anthropic's skill-creator skill (claude.ai-shipped version) with per-stage timing, a duration waterfall and a repeatable resync from upstream.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "author": {
         "name": "Angel Hermon"
       },

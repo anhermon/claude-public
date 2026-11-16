@@ -433,7 +433,7 @@ def generate_markdown(benchmark: dict) -> str:
 
     # Format time
     delta_time = f"{delta['time_seconds']}s" if delta.get("time_seconds") else "—"
-    lines.append(f"| Time | {mean_and_stddev(a_summary.get('time_seconds'), 1, 's')} | {mean_and_stddev(b_summary.get('time_seconds'), 1, 's')} | {delta_time} |")
+    lines.append(f"| Time (notification duration) | {mean_and_stddev(a_summary.get('time_seconds'), 1, 's')} | {mean_and_stddev(b_summary.get('time_seconds'), 1, 's')} | {delta_time} |")
 
     # Format tokens
     lines.append(f"| Tokens | {mean_and_stddev(a_summary.get('tokens'), 0)} | {mean_and_stddev(b_summary.get('tokens'), 0)} | {delta.get('tokens') or '—'} |")
