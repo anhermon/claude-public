@@ -424,7 +424,7 @@
       margin-bottom: 0.75rem;
     }
     .stage-chart-scroll { overflow-x: auto; }
-    .stage-chart-scroll svg { display: block; min-width: 440px; }
+    .stage-chart-scroll svg { display: block; min-width: 640px; } /* 1:1 with the SVG viewBox, so labels stay 11px and narrow screens scroll */
     .stage-chart .benchmark-table { margin-top: 1rem; margin-bottom: 0; }
     .benchmark-empty {
       color: var(--text-muted);
@@ -1338,7 +1338,7 @@
           const row = ((st.configurations[cfg] || {}).stages || {})[name];
           return row ? row.duration_seconds.mean : null;
         };
-        html += '<table class="benchmark-table"><thead><tr><th>Stage</th>';
+        html += '<div class="stage-chart-scroll"><table class="benchmark-table"><thead><tr><th>Stage</th>';
         for (const cfg of stConfigs) html += "<th>" + escapeHtml(cfg.replace(/_/g, " ")) + " (s)</th>";
         if (prevStages) html += "<th>Previous (s)</th><th>Change</th>";
         html += "</tr></thead><tbody>";
@@ -1362,7 +1362,7 @@
           }
           html += "</tr>";
         }
-        html += "</tbody></table></div>";
+        html += "</tbody></table></div></div>";
       }
 
       // Notes

@@ -22,6 +22,12 @@ def read(path):
         return f.read()
 
 
+class ScriptModeTest(unittest.TestCase):
+    def test_sync_script_is_executable(self):
+        script = os.path.join(PLUGIN, "scripts", "sync-upstream.sh")
+        self.assertTrue(os.access(script, os.X_OK))
+
+
 class SyncTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()

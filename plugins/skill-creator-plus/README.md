@@ -56,6 +56,8 @@ Make local changes only in `skills/`. Never edit `upstream/`: the next sync repl
    plugins/skill-creator-plus/scripts/sync-upstream.sh --dry-run [SOURCE_DIR]
    ```
 
+   If the shell reports "permission denied" (exit 126), run it as `bash plugins/skill-creator-plus/scripts/sync-upstream.sh ...` instead.
+
    Without `SOURCE_DIR` the script uses `~/.claude/skills/synced/*/skill-creator` and fails if there are zero or more than one match.
 3. Run it:
 
