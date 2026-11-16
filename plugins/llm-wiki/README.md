@@ -27,4 +27,15 @@ Uses a structured Obsidian vault at `~/knowledge-base/`:
 
 ## Source
 
-`claude-public` — Angel Hermon's public Claude/Paperclip plugins.
+`claude-public` — public Claude Code plugins.
+
+## Install and example
+
+```bash
+claude plugin marketplace add anhermon/claude-public
+claude plugin install llm-wiki@claude-public
+```
+
+Example: create `~/knowledge-base/` with an `index.md`, then say "add this to the wiki" with a pasted note or file path. The skill files it under `raw/`, updates the relevant pages and appends to `log.md`.
+
+Requirements: a markdown vault (Obsidian optional). `kb-to-wiki` needs Python 3.

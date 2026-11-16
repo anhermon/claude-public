@@ -66,6 +66,11 @@ def _probe(base: str, timeout: float = 0.9) -> int | None:
         return None
 
 
+DEFAULT_CC_LENS_PORT = 3001  # cc-lens default; override with CC_LENS_BASE_URL
+DEFAULT_CC_LENS_URL = f"http://localhost:{DEFAULT_CC_LENS_PORT}"
+PORT_SCAN_RANGE = range(DEFAULT_CC_LENS_PORT, DEFAULT_CC_LENS_PORT + 10)
+
+
 def find_running_cc_lens() -> str | None:
     """
     Return http://localhost:<port> for the first port in range that serves /api/stats.
@@ -73,7 +78,7 @@ def find_running_cc_lens() -> str | None:
     A 401 response still indicates cc-lens is running (just needs auth), so we return
     that base URL — the caller can surface a clear auth error later.
     """
-    for port in range(3001, 3011):
+    for port in PORT_SCAN_RANGE:
         base = f"http://127.0.0.1:{port}"
         status = _probe(base)
         if status == 200 or status == 401:
@@ -84,7 +89,7 @@ def find_running_cc_lens() -> str | None:
 def resolve_cc_lens_base_url() -> str:
     """
     Order: CC_LENS_BASE_URL, CONTEXT_OS_CC_LENS_URL, auto-discover running server,
-    else default http://localhost:3001.
+    else DEFAULT_CC_LENS_URL.
     """
     env = os.environ.get("CC_LENS_BASE_URL") or os.environ.get("CONTEXT_OS_CC_LENS_URL")
     if env:
@@ -92,4 +97,4 @@ def resolve_cc_lens_base_url() -> str:
     found = find_running_cc_lens()
     if found:
         return found
-    return "http://localhost:3001"
+    return DEFAULT_CC_LENS_URL

@@ -9,16 +9,17 @@ This skill enables an inference agent to interact with a repository that has bee
 
 ## Preparation: Ingesting a Repository
 
-This plugin does not vendor `rendergit` — it always fetches the current version from upstream so you get fixes/improvements automatically. If the user provides a repository URL that has not yet been ingested, or if you need fresh context, fetch and run it directly:
+This plugin does not vendor `rendergit` — it fetches a pinned upstream commit. If the user provides a repository URL that has not yet been ingested, or if you need fresh context, fetch and run it directly:
 
 ```bash
-CACHE=~/.cache/rendergit/rendergit.py
+RENDERGIT_SHA=14d7a58c0f4d815a3447f25e9ef1088c7e9ade84  # pinned; bump deliberately after reviewing upstream
+CACHE=~/.cache/rendergit/rendergit-$RENDERGIT_SHA.py
 mkdir -p "$(dirname "$CACHE")"
-curl -fsSL https://raw.githubusercontent.com/karpathy/rendergit/main/rendergit.py -o "$CACHE"
+curl -fsSL https://raw.githubusercontent.com/karpathy/rendergit/$RENDERGIT_SHA/rendergit.py -o "$CACHE"
 uv run --with markdown --with pygments --with tiktoken --with openai python "$CACHE" <REPO_URL> -o <OUTPUT_DIR>
 ```
 
-Re-run the `curl` step periodically (e.g. once per session) to pick up upstream changes — don't cache indefinitely. Use a consistent `<OUTPUT_DIR>` (e.g., `repo_context/`) to store the resulting `index.txt` and `.cxml` chunks.
+The version is pinned to a commit SHA so the code you execute is the code that was reviewed; to upgrade, review upstream and change `RENDERGIT_SHA`. Use a consistent `<OUTPUT_DIR>` (e.g., `repo_context/`) to store the resulting `index.txt` and `.cxml` chunks.
 
 ## Standard Workflow
 
