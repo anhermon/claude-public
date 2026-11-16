@@ -1,11 +1,23 @@
 # Changelog
 
-## [Unreleased]
+## [Unreleased] - 2026-11-16
+
+### Removed
+
+- Plugins `commit`, `code-review`, `review-agents`, `search`, `memory`, `pm`, `dev-guidelines`, `setup-telemetry`, `image-gen`, `observability`, and the stale root `.plugin` zips. See the README "Removed" table for replacements.
+
+### Changed
+
+- Catalog reduced to `premium-web`, `llm-wiki`, `research`, `agent-repo-search`, `context-os`; every entry has a `category`; README rewritten with a quality bar.
+- `context-os` version aligned to 2.2.0 across marketplace.json, plugin.json and README; cc-lens default URL is now a named constant.
+- `research` gains a README and plugin.json `version`; personal path and Paperclip references removed.
+- `agent-repo-search` pins `rendergit` to a commit SHA instead of fetching `main`.
+- marketplace.json description made accurate.
 
 ### Added
 
-- **skill-creator-plus 0.2.0: per-stage timing and a duration waterfall.** Evals now measure duration per stage of the tested skill, not only the total. `iteration-N/stages.json` lists the stages, executors append marks to `<run>/stages.jsonl`, and `scripts/stage_timing.py` computes per-stage durations, unaccounted time and mean/stddev per configuration. The benchmark gets a stage table, the viewer's Benchmark tab a waterfall chart (with the previous iteration), and each iteration a standalone `waterfall.svg`. The improve loop and analyzer now use stage timings, with score first and duration second.
-- **skill-creator-plus plugin (0.1.0)** — Anthropic's `skill-creator` skill from the claude.ai-synced copy (the GitHub copy is frozen at March 2026), kept as a pristine `upstream/` copy plus a locally extensible `skills/` copy. `scripts/sync-upstream.sh` resyncs upstream and 3-way merges the delta into `skills/`. Apache-2.0, credited to Anthropic.
+- `scripts/validate.sh`: validates the marketplace and all plugins.
+- **skill-creator-plus 0.2.0**: Anthropic's `skill-creator` skill (claude.ai-synced copy) as a pristine `upstream/` copy plus a locally extensible `skills/` copy, resynced with `scripts/sync-upstream.sh`. Evals measure duration per stage of the tested skill: `iteration-N/stages.json`, per-run `stages.jsonl` marks, `scripts/stage_timing.py`, a stage table in the benchmark, a waterfall chart in the viewer (with the previous iteration) and a standalone `waterfall.svg`. The improve loop and analyzer use stage timings, score first, duration second. Apache-2.0, credited to Anthropic.
 
 ## [0.2.3] — 2026-04-07
 

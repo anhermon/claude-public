@@ -1,0 +1,7 @@
+{
+  "name": "premium-web",
+  "version": "1.0.0",
+  "description": "Build premium, studio-quality web pages with a calibrated critic loop, a mandatory signature 'wow' moment, section-level rubric, genre-escape checks and image generation.",
+  "author": { "name": "Angel Hermon" },
+  "keywords": ["web", "design", "landing-page", "frontend", "critic", "imagegen"]
+}

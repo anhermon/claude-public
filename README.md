@@ -1,187 +1,61 @@
 # claude-public
 
-Angel Hermon's public collection of Claude Code plugins — install them directly from GitHub.
-
-## Claude Code marketplace
-
-This repository is a **marketplace**: it includes [".claude-plugin/marketplace.json"]. In Claude Code, add the marketplace URL:
-
-`https://github.com/anhermon/claude-public`
-
-Then install individual plugins from the catalog (for example `commit`, `code-review`, or `image-gen`). Each plugin’s source lives under ["plugins/"].
-
-Plugin entries use **`git-subdir`** sources so each plugin can be fetched from this monorepo without separate repositories.
-
-### If the catalog shows “No plugins available”
-
-1. **Refresh or re-add** the marketplace after updates, or run **`/plugin marketplace update`** (Desktop) / `claude plugin marketplace update` (CLI).
-
-2. **Claude Desktop / Cowork** may validate the catalog strictly (for example every entry needs an **`author`** field) or route third-party marketplaces through a remote sync path that [does not load external plugin sources yet](https://github.com/anthropics/claude-code/issues/41653). If the UI stays empty, install from the **terminal** (often more reliable for custom marketplaces):
-
-   ```bash
-   claude plugin marketplace add https://github.com/anhermon/claude-public
-   claude plugin install commit@claude-public
-   ```
-
-   Use `code-review` or `image-gen` instead of `commit` for the other plugins.
-
-## Install a plugin
+Public Claude Code plugins, installed from this repo as a marketplace.
 
 ```bash
-claude install anhermon/claude-public
+claude plugin marketplace add anhermon/claude-public
+claude plugin install <plugin>@claude-public
 ```
 
-This installs all plugins in this repo. To install a specific plugin by file:
+## Plugins
+
+| Plugin | Version | Category | What it does |
+|---|---|---|---|
+| [premium-web](plugins/premium-web) | 1.0.0 | design | Build premium, studio-quality web pages: section rubric, mandatory signature "wow" moment, calibrated critic loop, optional image generation. |
+| [llm-wiki](plugins/llm-wiki) | 1.1.0 | productivity | Maintain a markdown wiki: ingest sources, query with citations, lint for drift, publish as HTML (`kb-to-wiki`). |
+| [research](plugins/research) | 1.0.0 | research | Research a topic as a fast web-backed brief, or drive an AutoResearchClaw run that ends in a paper. |
+| [agent-repo-search](plugins/agent-repo-search) | 0.1.0 | development | Ingest a large repo with `rendergit` and read only the index and the chunks you need. |
+| [context-os](plugins/context-os) | 2.2.0 | development | Session and token analytics (cc-lens, ccusage), token-efficiency playbook, local knowledge graph. |
+| [skill-creator-plus](plugins/skill-creator-plus) | 0.2.0 | development | Anthropic's skill-creator (claude.ai version) plus per-stage timing and a duration waterfall in evals; resyncs from upstream. |
+
+## What belongs here
+
+A plugin stays only if it meets all four:
+
+1. No official or built-in Claude Code equivalent.
+2. Works on a clean machine, with no personal paths, ports or private project names.
+3. Has a README with an install line and an example.
+4. Has tests or evals.
+
+`research`, `llm-wiki`, `agent-repo-search` and `context-os` are on probation against item 4 and are tracked as follow-ups.
+
+## Removed
+
+Removed 2026-11-16 because each is redundant with a built-in or official plugin, or only works on one machine's stack. Never installed or invoked from this repo.
+
+| Removed | Use instead |
+|---|---|
+| commit | official `commit-commands` plugin |
+| code-review | built-in `/code-review`; official `code-review` and `pr-review-toolkit` |
+| review-agents | official `pr-review-toolkit` and `code-review` |
+| search | built-in Grep/Glob and Explore agent; official `*-lsp` plugins |
+| memory | built-in auto-memory (`MEMORY.md`); official `claude-md-management` |
+| pm | the BMAD-METHOD project itself; official `feature-dev` |
+| dev-guidelines | none (guidance prose); official `plugin-dev` / `feature-dev` for plugin work |
+| setup-telemetry | built-in OpenTelemetry export; official `session-report`; Langfuse's own Claude Code integration |
+| image-gen | none official; hard-coded to one machine's paths |
+| observability | none official; only worked against one private Grafana/Loki stack |
+
+Old versions remain available in git history.
+
+## Validate
 
 ```bash
-claude install anhermon/claude-public/commit.plugin
+sh scripts/validate.sh
 ```
 
----
-
-## Plugin catalog
-
-### skill-creator-plus
-**v0.1.0** — Anthropic's skill-creator (claude.ai-shipped version) with local extensions and a repeatable resync from upstream. See [plugins/skill-creator-plus/README.md](./plugins/skill-creator-plus/README.md).
-
-### commit
-**v1.0.0** — Write and execute a conventional commit automatically.
-
-### code-review
-**v1.0.0** — Structured code review with severity-ranked findings.
-
-### image-gen
-**v0.2.0** — AI image generation with expert prompt engineering.
-
-### search
-**v1.0.0** — Precise codebase exploration using ripgrep and tree-sitter.
-
-Finds definitions, call sites, and usages with structural awareness. Faster and more precise than default search for large codebases.
-
-**Trigger phrases:** "search for", "find where X is defined", "trace call sites of X", "how is X used", "explore the codebase"
-
-No prerequisites. `ripgrep` and `tree-sitter-cli` recommended for full power.
-
----
-
-### memory
-**v2.0.0** — Long-term memory via [MemPalace](https://github.com/MemPalace/mempalace): verbatim semantic recall over a local ChromaDB store.
-
-Thin skill wrapper around the real `mempalace` CLI — nothing vendored, always current. Mine project files or conversation exports, then search them semantically.
-
-**Trigger phrases:** "remember this", "recall from memory", "what did we decide about X", "mine this chat", "the palace", "my memories"
-
-Requires `pip install mempalace` (first run downloads a ~79MB embedding model).
-
----
-
-### pm
-**v1.0.0** — BMAD Project Manager Agent.
-
-Orchestrates software projects through the full 7-phase BMAD lifecycle: Ideation → PRD → Architecture → Stories → Implementation → QA → Integration.
-
-**Trigger phrases:** "/pm", "start a project", "resume project", "orchestrate this build", "BMAD lifecycle"
-
-No prerequisites. Persists state to `.memory/pm-state.json`.
-
----
-
-### agent-repo-search
-**v0.1.0** — Structural indexing and CXML chunking for massive codebases.
-
-Efficiently search and ingest repositories that exceed context limits using structural indexing.
-
-**Trigger phrases:** "ingest repo", "search indexed repo", "use structural search"
-
-Requires `uv` and `python 3.10+`.
-
----
-
-### research
-**v1.0.0** — Research any topic via AutoResearchClaw or Regular Research.
-
-Autonomous 23-stage pipeline (ResearchClaw) for academic-depth papers or fast Claude-native synthesis (Regular Research) for structured briefs.
-
-**Trigger phrases:** "research X", "/research", "investigate X", "look into X", "write a paper on X", "give me a brief on X"
-
-No prerequisites. Web search capability recommended.
-
----
-
-### llm-wiki
-**v1.1.0** — Persistent markdown wiki maintenance for Obsidian.
-
-Maintain a living knowledge base by absorbing source documents, answering questions with citations, auditing for drift, and capturing session insights. Includes `kb-to-wiki` skill for publishing the KB as a browsable HTML wiki.
-
-**Trigger phrases:** "ingest this", "add to wiki", "log this to KB", "lint the wiki", "check the KB", "find stale pages", "query the wiki"
-
-No prerequisites. Vault defaults to `~/knowledge-base/`.
-
----
-
-### setup-telemetry
-**v1.0.0** — Instrument Claude with Langfuse telemetry and local dashboard.
-
-Visualizes session metrics, tool usage, and performance insights.
-
-**Trigger phrases:** "set up telemetry", "instrument my project", "visualize session metrics", "show me telemetry dashboard"
-
-No prerequisites. Requires Langfuse account (optional for local-only).
-
----
-
-### dev-guidelines
-**v1.0.0** — General development guidelines: CI/infra decision trees, testing philosophy, Taskfile conventions, and an interactive review companion.
-
-Company-agnostic — routes to a local `org` skill for org-specific detail instead of assuming any particular employer's conventions.
-
-**Trigger phrases:** "what CI platform should I use", "what testing approach", "review this plan interactively"
-
-No prerequisites.
-
----
-
-### review-agents
-**v1.0.0** — Full codebase review orchestrated across 9 specialized subagents.
-
-Architecture, correctness, security, performance, observability, readability, API contracts, data, and CI/deps — each reviewed by a dedicated subagent, combined into one report via `/review`.
-
-**Trigger phrases:** "/review", "/review --domain security", "full codebase review"
-
-No prerequisites.
-
----
-
-### observability
-**v1.0.0** — Query Loki logs, Prometheus metrics, Tempo traces, and Grafana dashboards; analyze error patterns across a multi-agent system.
-
-**Trigger phrases:** "query loki", "check prometheus metrics", "trace this request", "error patterns across agents"
-
-Requires access to a Loki/Prometheus/Tempo/Grafana stack.
-
----
-
-## Development Philosophy
-
-**Purpose:** This repo hosts claude plugins marketplace — improved dev tooling and a learning knowledge base. Plugins here are not context-specific and aim to be useful to any Claude Code user.
-
-### Evolution Workflow
-
-This repo evolves through usage, not roadmaps:
-
-1. **Use** — Run these plugins in real dev workflows. Observe what works and what breaks.
-2. **Journal** — Record friction, failures, and surprises as structured feedback.
-3. **Derive** — Convert feedback into concrete issues with measurable acceptance criteria.
-4. **Branch** — Implement on feature branches. One concern per branch.
-5. **Benchmark** — CI runs the benchmark suite on every PR. Scores are emitted as `benchmark-results.json` in a standard format.
-6. **Merge** — Only merge when benchmarks confirm the change improves (or at minimum does not regress) the overall score.
-
----
+Runs `claude plugin validate` on the marketplace and every plugin and checks categories and versions agree. GitHub Actions is not used on this repo; run it locally.
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to author and submit plugins.
-
-## Code of Conduct
-
-See [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Code of conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md). License: MIT.

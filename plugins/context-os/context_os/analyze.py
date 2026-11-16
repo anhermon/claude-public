@@ -18,9 +18,9 @@ from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
-from context_os.cc_lens_url import resolve_cc_lens_base_url
+from context_os.cc_lens_url import DEFAULT_CC_LENS_URL, resolve_cc_lens_base_url
 
-BASE_URL = "http://localhost:3001"
+BASE_URL = DEFAULT_CC_LENS_URL
 
 # ─── Waste categories ──────────────────────────────────────────────────────────
 
