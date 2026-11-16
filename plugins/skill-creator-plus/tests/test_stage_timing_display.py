@@ -101,6 +101,31 @@ class DisplayTest(unittest.TestCase):
         self.assertIn("* not in stages.json", svg)
         self.assertRegex(svg, r">x\*</text>")
 
+    # one definition: the chart label for a stage is the table's per-run mean, with coverage when partial
+    def test_chart_label_equals_table_value_for_a_stage_in_some_runs(self):
+        svg = st.render_waterfall_svg(self.agg)
+        table = st.markdown_table(self.agg)
+        for name, label_runs in (("x", "1/2 runs"), ("y", "1/2 runs"), ("a", None)):
+            row = self.cfg["stages"][name]
+            value = f"{row['per_run_seconds']:.1f}s"
+            self.assertRegex(table, rf"\| {name} [^\n]*{re.escape(value)} per run \(n={row['runs']} of 2")
+            texts = re.findall(r'<text class="muted"[^>]*>([^<]*)</text>', svg)
+            labels = [t for t in texts if t.startswith(value)]
+            self.assertTrue(labels, f"no chart label starting with {value} for {name}: {texts}")
+            if label_runs:
+                self.assertIn(f"{value} \u00b7 {label_runs}", labels)
+            else:
+                self.assertIn(f"{value} \u00b1 {row['duration_seconds']['stddev']:.1f}", labels)
+                self.assertFalse([t for t in labels if "runs" in t])
+        # x is in one run of two: the when-present mean (10.0s) must not be what the chart shows
+        self.assertNotAlmostEqual(self.cfg["stages"]["x"]["duration_seconds"]["mean"], self.cfg["stages"]["x"]["per_run_seconds"])
+        self.assertNotIn(f"{self.cfg['stages']['x']['duration_seconds']['mean']:.1f}s \u00b1", svg)
+
+    def test_chart_bars_sum_to_per_run_totals(self):
+        svg = st.render_waterfall_svg(self.agg)
+        self.assertIn(f"{self.cfg['stages']['x']['per_run_seconds']:.1f}s", svg)
+        self.assertIn("per-run mean", svg)
+
     # 3. the executor prompt carries the exact allowed names
     def test_skill_md_pastes_allowed_names_into_the_executor_prompt(self):
         text = Path(SKILL, "SKILL.md").read_text()

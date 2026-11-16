@@ -256,6 +256,9 @@ RECONCILE_TOLERANCE_SECONDS = 1.0
 UNATTRIBUTED = "\0unattributed"
 STARTUP = "\0startup"
 HANDBACK = "\0handback"
+HOST_STALL = "\0host-stall"
+# An idle gap between two transcript events longer than this is a stall candidate
+STALL_THRESHOLD_SECONDS = 120.0
 
 # `# stage: name` (Bash command, must be the first non-blank line) or `stage: name` (a description or a text line)
 STAGE_LINE = re.compile(r"^[ \t]*(#[ \t]*)?stage:[ \t]*([A-Za-z0-9][A-Za-z0-9_.-]*)[ \t]*$", re.MULTILINE | re.IGNORECASE)
@@ -327,6 +330,62 @@ def read_transcript(path: Path) -> tuple[list[dict], list[str]]:
         else:
             gaps.append(f"line {number} of the transcript is not a JSON object, so it is ignored")
     return lines, gaps
+
+
+def idle_gaps(lines: list[dict], threshold: float = STALL_THRESHOLD_SECONDS) -> list[tuple[float, float]]:
+    """(start, end) epoch seconds of every gap longer than threshold between consecutive transcript timestamps."""
+    stamps = sorted(t for t in (parse_timestamp(line.get("timestamp")) for line in lines) if t is not None)
+    return [(a, b) for a, b in zip(stamps, stamps[1:]) if b - a > threshold]
+
+
+def find_stalls(gaps_by_run: dict[str, list[tuple[float, float]]]) -> dict[str, list[dict]]:
+    """
+    Host stalls per run: the long gaps that overlap a long gap in at least one other run.
+    Overlap across independent runs means the cause is outside the skill (a frozen host or harness).
+    Each stall is {"start", "end", "seconds", "shared_with_runs"} with epoch seconds; shared_with_runs
+    counts the other runs whose gap overlaps it.
+    """
+    found: dict[str, list[dict]] = {}
+    for label, gaps in gaps_by_run.items():
+        found[label] = []
+        for a, b in gaps:
+            shared = sum(1 for other, theirs in gaps_by_run.items()
+                         if other != label and any(a < y and x < b for x, y in theirs))
+            if shared:
+                found[label].append({"start": a, "end": b, "seconds": b - a, "shared_with_runs": shared})
+    return found
+
+
+def clock(epoch: float) -> str:
+    """Local wall-clock time of an epoch second, for notes."""
+    return datetime.datetime.fromtimestamp(epoch).strftime("%H:%M:%S")
+
+
+def carve_stalls(segments: list[dict], stalls: list[dict]) -> list[dict]:
+    """Segments with the part inside each stall interval moved to HOST_STALL (other parts keep their stage)."""
+    out = []
+    for seg in segments:
+        pieces = [(seg["a"], seg["b"], False)]
+        for stall in stalls:
+            nxt = []
+            for a, b, inside in pieces:
+                if inside or b <= stall["start"] or a >= stall["end"]:
+                    nxt.append((a, b, inside))
+                    continue
+                lo, hi = max(a, stall["start"]), min(b, stall["end"])
+                if lo > a:
+                    nxt.append((a, lo, False))
+                nxt.append((lo, hi, True))
+                if hi < b:
+                    nxt.append((hi, b, False))
+            pieces = nxt
+        total = (seg["b"] - seg["a"]) or 1.0
+        for a, b, inside in pieces:
+            piece = dict(seg, a=a, b=b, tokens=seg["tokens"] * (b - a) / total)
+            if inside:
+                piece["stage"] = HOST_STALL
+            out.append(piece)
+    return out
 
 
 def string_values(value, key=None):
@@ -479,20 +538,22 @@ def split_tool_window(a: float, b: float, runs: list[tuple[object, float]], mark
     return [(stage, a + i * step, a + (i + 1) * step) for i, stage in enumerate(stages)]
 
 
-def compute_transcript_run(lines: list[dict], sidecar_marks: list[dict] | None = None, known_stages: list[str] | tuple = (), gaps: list[str] | None = None) -> dict:
+def compute_transcript_run(lines: list[dict], sidecar_marks: list[dict] | None = None, known_stages: list[str] | tuple = (), gaps: list[str] | None = None, stalls: list[dict] | None = None, stall_threshold: float = STALL_THRESHOLD_SECONDS) -> dict:
     """
     Per-stage timing of one run from its transcript lines.
 
     sidecar_marks (the parsed stages.jsonl) only refines how a legacy command
     that batches several stage marks is split. The result's wall_seconds is the
-    transcript's first to last timestamp; stage time, startup, handback and
-    unattributed time add up to it.
+    transcript's first to last timestamp; stage time, startup, handback, host
+    stall and unattributed time add up to it. stalls (from find_stalls) are the
+    host-stall intervals; their time is removed from the stages and booked to
+    host stall. A long gap not in stalls stays in its stage and is noted.
     """
     gaps = list(gaps or [])
     marks = sidecar_marks or []
     turns, results, t0, t_end = build_calls(lines)
     if t0 is None:
-        return finish_run([], 0.0, 0.0, [], known_stages, gaps + ["the transcript holds no timestamped lines"])
+        return finish_run([], 0.0, 0.0, [], known_stages, gaps + ["the transcript holds no timestamped lines"], [])
 
     segments: list[dict] = []
     cursor = t0
@@ -564,15 +625,25 @@ def compute_transcript_run(lines: list[dict], sidecar_marks: list[dict] | None =
     for segment in segments:
         if segment["turn"] >= trailing and segment["stage"] not in (UNATTRIBUTED, STARTUP) and marked_turns:
             segment["stage"] = HANDBACK
+    stalls = [s for s in (stalls or []) if s["end"] > t0 and s["start"] < t_end]
+    for a, b in idle_gaps(lines, stall_threshold):
+        if not any(s["start"] <= a + 1e-6 and s["end"] >= b - 1e-6 for s in stalls):
+            gaps.append(f"long single-run gap: {b - a:.0f}s idle between {clock(a)} and {clock(b)}, kept in its stage because no other run stalled then")
+    if stalls:
+        segments = carve_stalls(segments, stalls)
     wall = max(t_end - t0, 0.0)
-    return finish_run(segments, wall, t0, turns, known_stages, gaps)
+    return finish_run(segments, wall, t0, turns, known_stages, gaps, stalls)
 
 
-def finish_run(segments: list[dict], wall: float, t0: float, turns, known_stages, gaps: list[str]) -> dict:
+def iso_of(epoch: float) -> str:
+    return datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def finish_run(segments: list[dict], wall: float, t0: float, turns, known_stages, gaps: list[str], stalls: list[dict] | None = None) -> dict:
     """Sum the segments into per-stage durations and check that they add up to the wall time."""
     stage_names = []
     for s in segments:
-        if s["stage"] not in (UNATTRIBUTED, STARTUP, HANDBACK) and s["stage"] not in stage_names:
+        if s["stage"] not in (UNATTRIBUTED, STARTUP, HANDBACK, HOST_STALL) and s["stage"] not in stage_names:
             stage_names.append(s["stage"])
     rows = {}
     for name in stage_names:
@@ -598,6 +669,7 @@ def finish_run(segments: list[dict], wall: float, t0: float, turns, known_stages
         return sum(s["b"] - s["a"] for s in segments if s["stage"] == stage)
 
     startup, handback, unattributed = total_of(STARTUP), total_of(HANDBACK), total_of(UNATTRIBUTED)
+    host_stall = total_of(HOST_STALL)
     if not names and wall > 0:
         unattributed += startup + handback
         startup = handback = 0.0
@@ -612,6 +684,9 @@ def finish_run(segments: list[dict], wall: float, t0: float, turns, known_stages
         "accounted_seconds": round(sum(rows[n]["duration_seconds"] for n in names), 4),
         "unattributed_seconds": round(unattributed, 4),
         "unaccounted_seconds": round(unattributed, 4),
+        "host_stall_seconds": round(host_stall, 4),
+        "stalls": [{"start": iso_of(s["start"]), "end": iso_of(s["end"]), "seconds": round(s["seconds"], 4),
+                    "shared_with_runs": s["shared_with_runs"]} for s in stalls or []],
         "gaps": gaps,
     }
     check_reconciliation(result)
@@ -619,9 +694,9 @@ def finish_run(segments: list[dict], wall: float, t0: float, turns, known_stages
 
 
 def check_reconciliation(run: dict) -> None:
-    """Stage time + startup + handback + unattributed must equal the transcript's wall time within a second."""
+    """Stage time + startup + handback + host stall + unattributed must equal the transcript's wall time within a second."""
     parts = (sum(s["duration_seconds"] or 0.0 for s in run["stages"]) + run["startup_seconds"]
-             + run["handback_seconds"] + run["unattributed_seconds"])
+             + run["handback_seconds"] + run["unattributed_seconds"] + run.get("host_stall_seconds", 0.0))
     if abs(parts - run["wall_seconds"]) > RECONCILE_TOLERANCE_SECONDS:
         raise ValueError(f"stage timing does not add up: parts {parts:.2f}s, transcript wall time {run['wall_seconds']:.2f}s")
 
@@ -654,7 +729,7 @@ def find_transcript(run_dir: Path, home: Path | None = None):
     return None
 
 
-def analyze_run(run_dir: Path, known_stages: list[str]):
+def analyze_run(run_dir: Path, known_stages: list[str], stalls: list[dict] | None = None, stall_threshold: float = STALL_THRESHOLD_SECONDS):
     """
     Compute one run's stage timing: from its transcript when there is one,
     else from stages.jsonl. None when the run has neither.
@@ -667,7 +742,7 @@ def analyze_run(run_dir: Path, known_stages: list[str]):
         lines, gaps = read_transcript(transcript)
         if any(parse_timestamp(line.get("timestamp")) is not None for line in lines):
             try:
-                result = compute_transcript_run(lines, marks, known_stages, gaps)
+                result = compute_transcript_run(lines, marks, known_stages, gaps, stalls, stall_threshold)
                 result["transcript"] = transcript.name
                 result["notification_seconds"] = total_seconds_of(run_dir)
                 return result
@@ -684,9 +759,32 @@ def analyze_run(run_dir: Path, known_stages: list[str]):
     return result
 
 
+def run_idle_gaps(run_dir: Path, threshold: float) -> list[tuple[float, float]]:
+    """The long idle gaps of a run's transcript (none when it has no transcript)."""
+    transcript = find_transcript(run_dir)
+    if transcript is None:
+        return []
+    lines, _ = read_transcript(transcript)
+    return idle_gaps(lines, threshold)
+
+
 def stats_of(rows: list[dict], key: str):
     values = [r[key] for r in rows if is_number(r.get(key))]
     return calculate_stats(values) if values else None
+
+
+def merge_stalls(stall_runs: list[tuple[str, dict]]) -> list[dict]:
+    """The distinct stall intervals across runs: overlapping ones merge; runs counts the runs inside each."""
+    items = sorted(((parse_timestamp(s["start"]), parse_timestamp(s["end"]), label) for label, s in stall_runs), key=lambda i: i[:2])
+    merged: list[dict] = []
+    for a, b, label in items:
+        if merged and a < merged[-1]["_end"]:
+            merged[-1]["_end"] = max(merged[-1]["_end"], b)
+            merged[-1]["_labels"].add(label)
+        else:
+            merged.append({"_start": a, "_end": b, "_labels": {label}})
+    return [{"start": iso_of(m["_start"]), "end": iso_of(m["_end"]), "seconds": round(m["_end"] - m["_start"], 4),
+             "runs": len(m["_labels"])} for m in merged]
 
 
 def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[dict], run_counts: dict[str, int]) -> dict:
@@ -734,6 +832,7 @@ def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[d
             "total_seconds": calculate_stats(totals) if totals else None,
             "startup_seconds": stats_of(results, "startup_seconds"),
             "handback_seconds": stats_of(results, "handback_seconds"),
+            "host_stall_seconds": stats_of(results, "host_stall_seconds"),
             "unaccounted_seconds": calculate_stats(unaccounted) if unaccounted else None,
             "notification_seconds": stats_of(results, "notification_seconds"),
         }
@@ -745,15 +844,17 @@ def aggregate(per_config: dict[str, list[tuple[str, dict]]], definitions: list[d
         if known and name not in known:
             gaps.append({"run": "all", "issue": f"stage {name} is not in {STAGES_FILE}; the executor used a name that was not allowed"})
     kinds = {c["source"] for c in configurations.values()}
+    stall_runs = [(label, stall) for runs in per_config.values() for label, r in runs for stall in r.get("stalls", [])]
     return {
         "source": kinds.pop() if len(kinds) == 1 else "mixed",
         "stages": [{"name": n, "description": descriptions.get(n, ""), "in_stages_json": n in known or not known} for n in order],
         "configurations": configurations,
+        "host_stalls": merge_stalls(stall_runs),
         "gaps": gaps,
     }
 
 
-def build_stage_timing(iteration_dir: Path, runs: list[tuple[str, str, Path]]):
+def build_stage_timing(iteration_dir: Path, runs: list[tuple[str, str, Path]], stall_threshold: float = STALL_THRESHOLD_SECONDS):
     """
     Analyze every run, write each run's stage_timing.json and return the aggregate.
 
@@ -765,9 +866,10 @@ def build_stage_timing(iteration_dir: Path, runs: list[tuple[str, str, Path]]):
     known = [d["name"] for d in definitions]
     per_config: dict[str, list[tuple[str, dict]]] = {}
     run_counts: dict[str, int] = {}
+    stalls = find_stalls({f"{config}\0{label}": run_idle_gaps(run_dir, stall_threshold) for config, label, run_dir in runs})
     for config, label, run_dir in runs:
         run_counts[config] = run_counts.get(config, 0) + 1
-        result = analyze_run(run_dir, known)
+        result = analyze_run(run_dir, known, stalls.get(f"{config}\0{label}"), stall_threshold)
         if result is None:
             continue
         per_config.setdefault(config, []).append((label, result))
@@ -797,6 +899,7 @@ svg.wf .grid { stroke: var(--wf-grid); stroke-width: 1; }
 svg.wf .gap { fill: none; stroke: var(--wf-muted); stroke-dasharray: 3 2; }
 svg.wf .seg-model { fill: #5c6bc0; }
 svg.wf .seg-tool { fill: #26a69a; }
+svg.wf .seg-stall { fill: url(#wf-stall-hatch); stroke: var(--wf-muted); stroke-width: 1; }
 svg.wf .seg-idle { fill: var(--wf-muted); opacity: 0.55; }
 """.strip()
 
@@ -816,6 +919,12 @@ def nice_step(maximum: float) -> float:
         if raw <= factor * magnitude:
             return factor * magnitude
     return 10 * magnitude
+
+
+def per_run_of(stage: dict) -> float:
+    """The one number shown for a stage everywhere: seconds it adds to an average run (absent runs count 0)."""
+    value = stage.get("per_run_seconds")
+    return stage["duration_seconds"]["mean"] if value is None else value
 
 
 def panels_for(stage_timing: dict, previous: dict | None) -> list[dict]:
@@ -851,6 +960,8 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
         names += [n for n in panel["data"].get("stages", {}) if n not in names]
     off_list = {s["name"] for s in stage_timing.get("stages", []) if s.get("in_stages_json") is False}
     overhead = ["startup", "handback"] if any(has_split(p["data"]) for p in panels) else []
+    if overhead and any((p["data"].get("host_stall_seconds") or {}).get("mean") for p in panels):
+        overhead.append("host stall")
 
     width, label_w, right_pad, top_pad = 640, 118, 96, 8
     row_h, axis_h, panel_gap = 20, 20, 12
@@ -866,7 +977,7 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
         total = (data.get("total_seconds") or {}).get("mean") or 0.0
         maximum = max(maximum, total)
         for stage in data.get("stages", {}).values():
-            maximum = max(maximum, stage["start_offset_seconds"]["mean"] + stage["duration_seconds"]["mean"])
+            maximum = max(maximum, stage["start_offset_seconds"]["mean"] + per_run_of(stage))
     step = nice_step(maximum)
     axis_max = math.ceil(maximum / step) * step if maximum > 0 else step
 
@@ -881,6 +992,7 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
         f'viewBox="0 0 {width} {height}" width="100%" role="img" aria-label="Stage duration waterfall">',
         f"<style>{SVG_STYLE}{(chr(10) + SVG_STANDALONE_DARK) if standalone else ''}</style>",
     ]
+    parts.append('<defs><pattern id="wf-stall-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#9e9e9e" stroke-width="2"/></pattern></defs>')
     if standalone:
         parts.append(f'<rect class="bg" width="{width}" height="{height}"/>')
     if not panels or not names:
@@ -913,16 +1025,19 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
             title += f" - {'transcript wall' if split else 'total'} {total:.1f}s"
         if unaccounted is not None and not split:
             title += f", unaccounted {unaccounted:.1f}s"
+        if not split:
+            title += ", bars: per-run mean"
         parts.append(f'<text class="title" x="0" y="{y0 + 14}">{escape(title)}</text>')
         if split:
             extra = []
-            for key, label in (("startup_seconds", "startup"), ("handback_seconds", "handback"), ("unaccounted_seconds", "unattributed")):
+            for key, label in (("startup_seconds", "startup"), ("handback_seconds", "handback"), ("host_stall_seconds", "host stall (outside skill)"), ("unaccounted_seconds", "unattributed")):
                 value = (data.get(key) or {}).get("mean")
                 if value is not None:
                     extra.append(f"{label} {value:.1f}s")
             notified = (data.get("notification_seconds") or {}).get("mean")
             if notified is not None and total is not None and abs(notified - total) > 0.05:
                 extra.append(f"notification duration {notified:.1f}s")
+            extra.append("bars: per-run mean")
             parts.append(f'<text class="muted" x="0" y="{y0 + 29}">{escape(" · ".join(extra))}</text>')
         rows_top = y0 + title_h
         # Grid lines and axis labels
@@ -935,15 +1050,19 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
         for r_index, name in enumerate(names_all):
             y = rows_top + r_index * row_h
             if name in overhead:
-                seconds = (data.get(f"{name}_seconds") or {}).get("mean")
+                stall_row = name == "host stall"
+                seconds = (data.get("host_stall_seconds" if stall_row else f"{name}_seconds") or {}).get("mean")
                 parts.append(f'<text class="muted" x="{label_w - 6}" y="{y + 14}" text-anchor="end">{name}</text>')
                 if seconds is None:
                     parts.append(f'<text class="muted" x="{label_w + 4}" y="{y + 14}">no data</text>')
                 else:
-                    begin = 0.0 if name == "startup" else max((total or 0.0) - seconds, 0.0)
+                    handback = (data.get("handback_seconds") or {}).get("mean") or 0.0
+                    begin = 0.0 if name == "startup" else max((total or 0.0) - seconds - (handback if stall_row else 0.0), 0.0)
                     w = max(plot_w * seconds / axis_max, 1.5)
-                    parts.append(f'<rect class="seg-idle" x="{x_of(begin):.1f}" y="{y + 3}" width="{w:.1f}" height="{row_h - 6}" rx="2"><title>{name}: {seconds:.1f}s, not part of any stage</title></rect>')
-                    parts.append(f'<text class="muted" x="{x_of(begin) + w + 4:.1f}" y="{y + 14}">{seconds:.1f}s</text>')
+                    css, text = ("seg-stall", "host stall (outside skill)") if stall_row else ("seg-idle", name)
+                    note = "the host or harness was frozen, not the skill" if stall_row else "not part of any stage"
+                    parts.append(f'<rect class="{css}" x="{x_of(begin):.1f}" y="{y + 3}" width="{w:.1f}" height="{row_h - 6}" rx="2"><title>{text}: {seconds:.1f}s, {note}</title></rect>')
+                    parts.append(f'<text class="muted" x="{x_of(begin) + w + 4:.1f}" y="{y + 14}">{seconds:.1f}s{" host stall (outside skill)" if stall_row else ""}</text>')
                 continue
             parts.append(f'<text x="{label_w - 6}" y="{y + 14}" text-anchor="end">{escape(name)}{"*" if name in off_list else ""}</text>')
             stage = data.get("stages", {}).get(name)
@@ -951,24 +1070,28 @@ def render_waterfall_svg(stage_timing: dict, previous: dict | None = None, stand
                 parts.append(f'<text class="muted" x="{label_w + 4}" y="{y + 14}">no data</text>')
                 continue
             start = stage["start_offset_seconds"]["mean"]
-            duration = stage["duration_seconds"]["mean"]
+            present = stage["duration_seconds"]["mean"]
+            duration = per_run_of(stage)
             stddev = stage["duration_seconds"]["stddev"]
+            timed = data.get("runs", stage["runs"])
+            partial = stage["runs"] < timed
             bar_w = max(plot_w * duration / axis_max, 1.5)
+            label = f"{duration:.1f}s · {stage['runs']}/{timed} runs" if partial else f"{duration:.1f}s ± {stddev:.1f}"
             model = (stage.get("model_seconds") or {}).get("mean")
             tool = (stage.get("tool_seconds") or {}).get("mean")
-            detail = f"{name}: {duration:.1f}s +/- {stddev:.1f}s, starts at {start:.1f}s, {stage['runs']} runs"
+            detail = f"{name}: {duration:.1f}s per run (mean over {timed} runs, absent runs count 0); {present:.1f}s +/- {stddev:.1f}s when present, in {stage['runs']}/{timed} runs, starts at {start:.1f}s"
             if model is not None and tool is not None:
                 detail += f", model {model:.1f}s, tool {tool:.1f}s"
                 tokens = (stage.get("output_tokens") or {}).get("mean")
                 if tokens:
                     detail += f", {tokens:.0f} output tokens"
-                model_w = min(bar_w * (model / duration if duration > 0 else 0.5), bar_w)
+                model_w = min(bar_w * (model / present if present > 0 else 0.5), bar_w)
                 x = x_of(start)
                 parts.append(f'<rect class="seg-model" x="{x:.1f}" y="{y + 3}" width="{model_w:.1f}" height="{row_h - 6}" rx="2"><title>{escape(detail)}</title></rect>')
                 parts.append(f'<rect class="seg-tool" x="{x + model_w:.1f}" y="{y + 3}" width="{bar_w - model_w:.1f}" height="{row_h - 6}" rx="2"><title>{escape(detail)}</title></rect>')
             else:
                 parts.append(f'<rect x="{x_of(start):.1f}" y="{y + 3}" width="{bar_w:.1f}" height="{row_h - 6}" rx="2" fill="{color}"><title>{escape(detail)}</title></rect>')
-            parts.append(f'<text class="muted" x="{x_of(start) + bar_w + 4:.1f}" y="{y + 14}">{duration:.1f}s ± {stddev:.1f}</text>')
+            parts.append(f'<text class="muted" x="{x_of(start) + bar_w + 4:.1f}" y="{y + 14}">{label}</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 
@@ -1047,6 +1170,9 @@ def markdown_table(stage_timing: dict) -> str:
         flag = "" if stage.get("in_stages_json", True) else " *(not in stages.json)*"
         lines.append(f"| {stage['name']}{flag} | " + " | ".join(cells) + " |")
     extra = [("startup", "startup_seconds"), ("handback", "handback_seconds")] if split else []
+    stalled = split and any((c.get("host_stall_seconds") or {}).get("mean") for c in cfgs.values())
+    if stalled:
+        extra.append(("host stall", "host_stall_seconds"))
     for label, key in extra:
         lines.append(f"| {label} | " + " | ".join(cell(cfgs[c].get(key)) for c in configs) + " |")
     lines.append(f"| {'unattributed' if split else 'unaccounted'} | " + " | ".join(cell(cfgs[c]["unaccounted_seconds"]) for c in configs) + " |")
@@ -1058,12 +1184,20 @@ def markdown_table(stage_timing: dict) -> str:
         if total is None or data.get("source") != "transcript":
             continue
         rows = sum(r.get("per_run_seconds", 0.0) for r in data["stages"].values())
-        rows += sum((data.get(k) or {"mean": 0.0})["mean"] for k in ("startup_seconds", "handback_seconds", "unaccounted_seconds"))
+        rows += sum((data.get(k) or {"mean": 0.0})["mean"] for k in ("startup_seconds", "handback_seconds", "host_stall_seconds", "unaccounted_seconds"))
         verdict = "rows add up to" if abs(rows - total) <= 0.05 else f"rows add up to {rows:.1f}s, which differs from"
-        lines.append(f"{config.replace('_', ' ').title()}: stage rows (per run) + startup + handback + unattributed: {verdict} {total:.1f}s = mean transcript wall time.")
+        lines.append(f"{config.replace('_', ' ').title()}: stage rows (per run) + startup + handback + host stall + unattributed: {verdict} {total:.1f}s = mean transcript wall time.")
         notified = data.get("notification_seconds")
         if notified and abs(notified["mean"] - total) > 0.05:
             lines.append(f"{config.replace('_', ' ').title()}: notification duration (duration_ms from the task notification, the Time row above) is {notified['mean']:.1f}s; transcript wall is {total:.1f}s. This table uses transcript wall time.")
+    for stall in stage_timing.get("host_stalls", []):
+        a, b = parse_timestamp(stall["start"]), parse_timestamp(stall["end"])
+        lines.append(f"Host stall {clock(a)} to {clock(b)} ({stall['seconds']:.0f}s) is shared by {stall['runs']} runs, so it happened outside the skill (host or harness freeze) and is not counted in any stage.")
+    for config in configs:
+        data = cfgs[config]
+        stall, total = (data.get("host_stall_seconds") or {}).get("mean"), (data.get("total_seconds") or {}).get("mean")
+        if stall and total and stall > 0.2 * total:
+            lines.append(f"{config.replace('_', ' ').title()}: host stall is {100 * stall / total:.0f}% of wall time, so these run timings are degraded.")
     counts = ", ".join(f"{c}: {d['runs']} of {d['runs_total']}" for c, d in cfgs.items())
     lines.extend(["", f"Runs with timing: {counts}. Per-stage n counts the runs in which the stage appears."])
     sources = {c: d.get("source", "marks") for c, d in cfgs.items()}
@@ -1083,6 +1217,8 @@ def main():
     parser = argparse.ArgumentParser(description="Compute per-stage timing and a waterfall chart for an iteration")
     parser.add_argument("iteration_dir", type=Path, help="Path to the iteration directory")
     parser.add_argument("--previous", type=Path, default=None, help="Previous iteration directory (default: iteration-(N-1) beside this one)")
+    parser.add_argument("--stall-threshold", type=float, default=STALL_THRESHOLD_SECONDS,
+                        help=f"Idle seconds between transcript events that make a gap a host-stall candidate (default {STALL_THRESHOLD_SECONDS:g})")
     args = parser.parse_args()
     if not args.iteration_dir.is_dir():
         print(f"Directory not found: {args.iteration_dir}")
@@ -1099,7 +1235,7 @@ def main():
             for number, run_dir in find_run_dirs(config_dir):
                 runs.append((config_dir.name, f"{eval_dir.name}/{config_dir.name}/run-{number}", run_dir))
 
-    stage_timing = build_stage_timing(args.iteration_dir, runs)
+    stage_timing = build_stage_timing(args.iteration_dir, runs, args.stall_threshold)
     if stage_timing is None:
         print(f"No transcript or {MARKS_FILE} with stage markers found under {args.iteration_dir}, so there is no stage timing.", file=sys.stderr)
         sys.exit(1)
