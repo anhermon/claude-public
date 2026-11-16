@@ -3,22 +3,20 @@
 Thank you for your interest in contributing! This repo is Angel Hermon's public collection
 of Claude Code plugins. Contributions that add useful, well-crafted plugins are welcome.
 
-**Layout:** Each plugin’s source lives under `plugins/<name>/` (manifest, README, and skill). The repo root holds `<name>.plugin` zip files built from those directories, and [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) lists every plugin for Claude Code’s marketplace UI.
+**Layout:** Each plugin’s source lives under `plugins/<name>/` (manifest, README, and skill). [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) lists every plugin for Claude Code’s marketplace UI.
 
 ---
 
 ## What is a plugin?
 
-A **plugin** is a `.plugin` file — a zip archive that Claude Code can install directly.
-It contains:
+A **plugin** is a directory under `plugins/<name>/`, listed in the marketplace, that users install with
+`claude plugin install <name>@claude-public`. It contains:
 
 ```
 .claude-plugin/plugin.json   ← manifest (required)
 README.md                    ← user-facing description (required)
 skills/<name>/SKILL.md       ← skill instructions (required)
 ```
-
-Author new plugins under `plugins/<name>/` using the same layout; the zip is just that tree packaged for direct installs.
 
 The `SKILL.md` is a markdown file with YAML front matter that Claude reads as a skill:
 it defines when to trigger and provides step-by-step instructions for Claude to follow.
@@ -29,7 +27,7 @@ it defines when to trigger and provides step-by-step instructions for Claude to 
 
 | Item | Convention | Example |
 |------|------------|---------|
-| Plugin file | `<name>.plugin` | `llm-wiki.plugin` |
+| Plugin directory | `plugins/<name>/` | `plugins/llm-wiki/` |
 | Skill directory | `plugins/<name>/skills/<name>/` | `plugins/llm-wiki/skills/llm-wiki/` |
 | Skill name | lowercase, hyphenated | `agent-repo-search` |
 | Version | semver `X.Y.Z` | `1.0.0` |
@@ -84,20 +82,6 @@ Brief intro.
 
 ---
 
-## How to build a `.plugin` file
-
-The `.plugin` file is a standard zip archive. You can create it with any zip tool:
-
-```bash
-cd plugins/my-skill
-zip -r ../../my-skill.plugin .claude-plugin/ README.md skills/
-```
-
-Or use Node.js, Python, or any zip library. The file must be a valid ZIP with no
-compression (stored) or deflate compression — both work with Claude Code.
-
----
-
 ## Submitting a plugin
 
 1. **Fork** this repo and create a feature branch:
@@ -107,14 +91,14 @@ compression (stored) or deflate compression — both work with Claude Code.
 
 2. **Add your files:**
    - `plugins/my-skill/` — `.claude-plugin/plugin.json`, `README.md`, and `skills/my-skill/SKILL.md`
-   - `my-skill.plugin` — zip of that directory (see above), at repo root
-   - An entry in [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) (`name`, `source`, `description`, `version`)
+   - A `README.md` with an install line and an example
+   - An entry in [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) (`name`, `source`, `description`, `category`, and a `version` matching `plugin.json`)
 
-3. **Test the plugin locally:**
+3. **Validate and test locally:**
    ```bash
-   claude install ./my-skill.plugin
+   sh scripts/validate.sh
    ```
-   Verify the skill is listed and triggers correctly.
+   It must end with `validate: OK`. Then verify the skill triggers correctly.
 
 4. **Open a PR** against `main`. Include in the PR description:
    - What the skill does
@@ -134,6 +118,8 @@ Plugins in this repo should meet a basic quality bar:
 - [ ] No hardcoded personal paths (use `~/` or env vars)
 - [ ] `plugin.json` has all required fields with accurate description
 - [ ] Tested at least once against a real scenario
+
+To stay in the repo a plugin must also meet the four criteria under "What belongs here" in the [README](./README.md#what-belongs-here): no official or built-in equivalent, works on a clean machine, README with install line and example, and tests or evals.
 
 ---
 
