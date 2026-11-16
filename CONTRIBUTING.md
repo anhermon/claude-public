@@ -29,9 +29,9 @@ it defines when to trigger and provides step-by-step instructions for Claude to 
 
 | Item | Convention | Example |
 |------|------------|---------|
-| Plugin file | `<name>.plugin` | `commit.plugin` |
-| Skill directory | `plugins/<name>/skills/<name>/` | `plugins/commit/skills/commit/` |
-| Skill name | lowercase, hyphenated | `code-review` |
+| Plugin file | `<name>.plugin` | `llm-wiki.plugin` |
+| Skill directory | `plugins/<name>/skills/<name>/` | `plugins/llm-wiki/skills/llm-wiki/` |
+| Skill name | lowercase, hyphenated | `agent-repo-search` |
 | Version | semver `X.Y.Z` | `1.0.0` |
 
 ---

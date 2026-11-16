@@ -15,7 +15,7 @@ Single Claude Code plugin combining:
 
 ## Install
 
-1. Add this plugin to Claude Code (plugin path or marketplace).
+1. Add this plugin: `claude plugin marketplace add anhermon/claude-public` then `claude plugin install context-os@claude-public`.
 
 2. **Install the `context-os` CLI globally** (pick one):
 

@@ -1,5 +1,23 @@
 # Changelog
 
+## [Unreleased] - 2026-11-16
+
+### Removed
+
+- Plugins `commit`, `code-review`, `review-agents`, `search`, `memory`, `pm`, `dev-guidelines`, `setup-telemetry`, `image-gen`, `observability`, and the stale root `.plugin` zips. See the README "Removed" table for replacements.
+
+### Changed
+
+- Catalog reduced to `premium-web`, `llm-wiki`, `research`, `agent-repo-search`, `context-os`; every entry has a `category`; README rewritten with a quality bar.
+- `context-os` version aligned to 2.2.0 across marketplace.json, plugin.json and README; cc-lens default URL is now a named constant.
+- `research` gains a README and plugin.json `version`; personal path and Paperclip references removed.
+- `agent-repo-search` pins `rendergit` to a commit SHA instead of fetching `main`.
+- marketplace.json description made accurate.
+
+### Added
+
+- `scripts/validate.sh`: validates the marketplace and all plugins.
+
 ## [0.2.3] — 2026-04-07
 
 ### Fixed
