@@ -2,16 +2,21 @@
 // logged-in Chrome. Trackers are blocked BEFORE the first navigation.
 // Usage: node chrome-shot.mjs <url> <outdir> [widths=1440,390]
 //   env: RM=1 (prefers-reduced-motion), SCHEME=light|dark, STEPS=n (max viewport shots per width, default 10),
+//        MODE=app (alias: tool) | marketing (default): the tells.js profile. Step 0 gate: NOTES.md must hold a "## Step 0 classification" section (scripts/classify.py, PW_NOTES=<path> or
+//          NOTES.md in the out dir's ancestors / cwd) whose mode equals MODE, else exit 4 and nothing runs. Only EVAL=measure-site.js (measuring OTHER sites' references, step 2) is exempt.
 //        EVAL=<file.js> (evaluate a script, e.g. measure-site.js, and save its result; SUMMARY=1 asks measure-site.js for its short form), SHOTS=0 (checks only)
 //        SECTIONS=1 (or a selector; default "main > section, footer"): one dir per section in <outdir>/sections/<nn-id>/,
 //          files <width>[-pN].png (tall sections split per viewport, max 3). Fixed and sticky headers hidden (WOW scroll offset = measured header height), reveals settled (waits for finite animations to finish, cap 5s).
 //          Feed the dir to critic.py.
+//        WOW_DELAY=<ms>: shift every time frame later (default 0). Frames are clocked from the scroll-to-wow, and a scroll-reveal (.6s + --i*60ms stagger) is
+//        still moving at 250-500ms, so for a wow that reveals on scroll set WOW_DELAY ~ 600 + 60*maxStagger (e.g. 900) so t1 is post-reveal; for load/WOW_ACT animations leave 0.
 //        WOW=<selector>: reload, scroll to it, take 7 mid-animation frames (0.25-4.5s; after WOW_ACT=<js> if set) or,
 //        for a [data-scene], beat 1 + each beat boundary at 250/700ms + the end (8 frames for 4 beats) -> sections/wow/<width>-tN.png (RM=1: <width>-rm-tN.png)
 //          (with RM=1 they are named <width>-rm-tN.png: run once without and once with RM=1 so the critic sees the fallback)
 // Writes <outdir>/<w>-NN.png (one per viewport while scrolling like a visitor) and <outdir>/report.json.
-// Exit code 1 if any width has horizontal scroll, page errors, failed fonts or a custom font that never rendered.
-import { spawn } from "node:child_process";
+// Exit codes: 4 = classification missing/invalid (no Chrome started); 2 = usage / Chrome would not start; 1 = problems below; 0 = clean.
+// Exit code 1 if any width has horizontal scroll, tells.js craft_fail or no tells.js desktop verdict (UNVERIFIED), page errors, failed fonts or a custom font that never rendered.
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -22,11 +27,20 @@ const CHROME = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Conte
 const BLOCK = ["*posthog*", "*googletagmanager*", "*google-analytics*", "*plausible.io*", "*segment.io*", "*mixpanel*", "*hotjar*", "*clarity.ms*"];
 const STEPS = +(process.env.STEPS || 10);
 fs.mkdirSync(out, { recursive: true });
+const MODE = process.env.MODE === "tool" ? "app" : process.env.MODE || "marketing"; // tool is the old name of app
+let CLASS = null; // step 0 classification (scripts/classify.py): injected into tells.js as window.__TELLS_CLASS
+if (!/measure-site/.test(process.env.EVAL || "")) {
+  const r = spawnSync("python3", [path.join(path.dirname(new URL(import.meta.url).pathname), "classify.py"), "--mode", MODE, "--from", path.resolve(out), "--json"], { encoding: "utf8" });
+  if (r.status !== 0) { console.error(r.stderr || "CLASSIFICATION REQUIRED: classify.py did not run (python3 missing?)"); process.exit(r.status === 4 ? 4 : 2); }
+  CLASS = JSON.parse(r.stdout);
+}
+let tellsDesktop = false;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pw-chrome-"));
 const chrome = spawn(CHROME, ["--headless=new", "--remote-debugging-port=0", "--remote-allow-origins=*", `--user-data-dir=${dir}`,
   "--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "--enable-webgl", "--ignore-gpu-blocklist", "about:blank"], { stdio: "ignore" });
+chrome.on("error", (e) => { console.error(`UNVERIFIED: Chrome could not start (${e.message}); set CHROME_PATH. No gate ran.`); process.exit(2); });
 let port;
 for (let i = 0; i < 100 && !port; i++) { await wait(100); try { port = fs.readFileSync(path.join(dir, "DevToolsActivePort"), "utf8").split("\n")[0]; } catch {} }
 if (!port) { console.error("Chrome did not start"); chrome.kill(); process.exit(2); }
@@ -105,7 +119,7 @@ for (const w of ws.split(",").map(Number)) {
     const sc = await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(process.env.WOW)}); if (!e || !e.matches('[data-scene]') || e.classList.contains('is-static')) return null; const b = e.getBoundingClientRect(); return { top: b.top + scrollY, span: Math.max(0, b.height - innerHeight), steps: e.querySelectorAll('.scene-step').length || 4 }; })()`);
     // WOW_ACT=<js> starts an interaction (click, replay, drag) and then frames are time-spaced from that moment.
     // Frames are MID-ANIMATION on purpose: polish is judged in motion, not at rest (ember r2 Rail lesson).
-    let N; const act = process.env.WOW_ACT, times = [250, 500, 800, 1200, 1800, 2700, 4500]; N = process.env.RM === "1" ? 2 : times.length;
+    let N; const act = process.env.WOW_ACT, times = [250, 500, 800, 1200, 1800, 2700, 4500].map((x) => x + (+process.env.WOW_DELAY || 0)); N = process.env.RM === "1" ? 2 : times.length;
     // scroll scene: beat 1 at rest, then every beat boundary caught twice mid-transition (250ms, 700ms), then the end
     // at rest. Evenly spaced positions landed on settled beats and never showed the payoff transition (sealref r7).
     const plan = sc && !act && process.env.RM !== "1" ? [[0, 1600]].concat([...Array(sc.steps - 1)].flatMap((_, i) => [[(i + 1) / sc.steps + 0.01, 250], [null, 450]]), [[1, 1600]]) : null;
@@ -135,9 +149,14 @@ for (const w of ws.split(",").map(Number)) {
   let evalResult;
   if (process.env.EVAL) { // scan a fully revealed page: scroll-reveals left at opacity 0 read as "no media" (Plumb r7 false tells after the WOW reload)
     await evaluate(`(async () => { document.documentElement.style.scrollBehavior = 'auto'; for (let y = 0; y < document.documentElement.scrollHeight; y += innerHeight * 0.6) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); } await new Promise((r) => setTimeout(r, 900)); scrollTo(0, 0); })()`);
-    evalResult = await evaluate((process.env.SUMMARY ? "window.__SUMMARY = true;\n" : "") + fs.readFileSync(process.env.EVAL, "utf8"));
+    evalResult = await evaluate((process.env.SUMMARY ? "window.__SUMMARY = true;\n" : "") + `window.__TELLS_MODE = ${JSON.stringify(MODE)};\nwindow.__TELLS_CLASS = ${JSON.stringify(CLASS && { mode: MODE, classification: CLASS.classification, density_target: parseInt(CLASS.density_target) || 0 })};\n` + fs.readFileSync(process.env.EVAL, "utf8"));
   }
   const problems = [];
+  if (process.env.EVAL && /tells/.test(process.env.EVAL)) { // a gate that did not run, or ran and failed, must not leave exit 0
+    if (evalResult?.desktop_gates) tellsDesktop = true;
+    if (!evalResult || evalResult.error) problems.push(`UNVERIFIED: tells.js gave no result at ${w}px (${evalResult?.error || "no result"})`);
+    else if (evalResult.craft_fail?.length) problems.push(`CRAFT GATE FAIL (${evalResult.mode}): ${evalResult.craft_fail.join(", ")}`);
+  }
   if (checks.sw > checks.cw) problems.push(`horizontal scroll: scrollWidth ${checks.sw} > ${checks.cw}`, ...checks.wide.map((x) => "too wide: " + x));
   if (errs.length) problems.push(...errs);
   if (checks.faces.some((f) => / error$/.test(f))) problems.push("font failed to load: " + checks.faces.filter((f) => / error$/.test(f)).join("; "));
@@ -147,7 +166,8 @@ for (const w of ws.split(",").map(Number)) {
   console.log(`${w}px: ${problems.length ? "PROBLEMS" : "ok"} | sw ${checks.sw}/${checks.cw} | ${shots.length} shots | trackers blocked ${blocked.length} | rendered ${JSON.stringify(rendered)}`);
   problems.forEach((p) => console.log("   - " + p));
 }
-fs.writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
+if (process.env.EVAL && /tells/.test(process.env.EVAL) && !tellsDesktop) { console.log("UNVERIFIED: tells.js desktop gates (type_scale, wow_visible, scale_change) did not run: include a width >= 1000 (e.g. 1440)"); failed = true; }
+fs.writeFileSync(`${out}/${process.env.RM === "1" ? "report-rm" : "report"}.json`, JSON.stringify(report, null, 2)); // RM=1 must never overwrite the gate-2 report.json (critic.py reads its eval)
 sock.close(); chrome.kill();
 try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
 console.log(`report: ${out}/report.json  — now OPEN every PNG and look at it.`);
