@@ -11,7 +11,7 @@ claude plugin install <plugin>@claude-public
 
 | Plugin | Version | Category | What it does |
 |---|---|---|---|
-| [premium-web](plugins/premium-web) | 1.0.0 | design | Build premium, studio-quality web pages: section rubric, mandatory signature "wow" moment, calibrated critic loop, optional image generation. |
+| [premium-web](plugins/premium-web) | 2.0.0 | design | Build premium, studio-quality web pages as several candidates (default 3) you browse and pick from in a Claude Code mod pane (needs Claude Code 2.1.287+), then finish the winner: section rubric, mandatory signature "wow" moment, calibrated critic loop, optional image generation. |
 | [llm-wiki](plugins/llm-wiki) | 1.1.0 | productivity | Maintain a markdown wiki: ingest sources, query with citations, lint for drift, publish as HTML (`kb-to-wiki`). |
 | [research](plugins/research) | 1.0.0 | research | Research a topic as a fast web-backed brief, or drive an AutoResearchClaw run that ends in a paper. |
 | [agent-repo-search](plugins/agent-repo-search) | 0.1.0 | development | Ingest a large repo with `rendergit` and read only the index and the chunks you need. |

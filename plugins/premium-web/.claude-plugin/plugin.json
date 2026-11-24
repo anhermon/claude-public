@@ -1,7 +1,17 @@
 {
   "name": "premium-web",
-  "version": "1.0.0",
-  "description": "Build premium, studio-quality web pages with a calibrated critic loop, a mandatory signature 'wow' moment, section-level rubric, genre-escape checks and image generation.",
+  "version": "2.0.0",
+  "description": "Build premium, studio-quality web pages as several competing candidates you browse and pick from in a Claude Code mod pane, then finish the winner with a calibrated critic loop, a mandatory signature 'wow' moment and image generation.",
   "author": { "name": "Angel Hermon" },
-  "keywords": ["web", "design", "landing-page", "frontend", "critic", "imagegen"]
+  "keywords": ["web", "design", "landing-page", "frontend", "critic", "imagegen", "mod", "candidates"],
+  "userConfig": {
+    "candidateCount": {
+      "type": "number",
+      "title": "Candidates per premium build",
+      "description": "How many materially different candidate sites the premium-web skill builds before you pick one (1-6, default 3). A number in your request, such as 'build 5 candidates', overrides this for that run.",
+      "default": 3,
+      "min": 1,
+      "max": 6
+    }
+  }
 }
