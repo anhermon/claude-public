@@ -134,7 +134,7 @@ def _pricing_for_model(model: str | None) -> dict:
 
 
 def _project_display(slug: str) -> str:
-    """Turn a project folder slug (C--Users-User--paperclip) into a readable tail.
+    """Turn a project folder slug (C--Users-me--my-project) into a readable tail.
 
     We keep the last 3 path segments because the leading drive prefix is noise.
     """

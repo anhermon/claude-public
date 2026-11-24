@@ -186,6 +186,9 @@
   // wow_visible (marketing): a canvas/svg/video/img >= 25% of viewport width and >= 30% of viewport height must start inside the first viewport (the wow is above the fold). (Comment said 50% x 40% until 2026-10-05; the code was always 25% x 30%, wow.md agrees with the code. Tool mode enforces 50% x 40%.)
   const first = [...document.querySelectorAll("canvas, svg, img, video, picture, [data-wow], section, header, div")].some((e) => { if (!vis(e)) return false; const r = e.getBoundingClientRect(), cs = getComputedStyle(e); const media = /^(CANVAS|SVG|IMG|VIDEO|PICTURE)$/i.test(e.tagName) || e.hasAttribute("data-wow") || cs.backgroundImage.includes("url("); return media && r.width >= vw * 0.25 && r.height >= innerHeight * 0.3 && r.top < innerHeight * 0.75 && r.top + scrollY >= 0 && r.top + scrollY < innerHeight; });
   out.wow_visible = { hit: vw >= 1000 && !first }; // desktop only; 390 is judged from the critic frames
+  // storefronts (styles.md e-commerce rule 5): product cards carry [data-product]; a link from one to another origin sends the buyer away
+  const outLinks = [...document.querySelectorAll("[data-product] a[href]")].filter((a) => a.origin && a.origin !== location.origin);
+  out.product_links_out = { count: outLinks.length, examples: outLinks.slice(0, 3).map((a) => a.href), hit: outLinks.length > 0 };
   let craftKeys = ["panel_run", "scale_change", "type_scale", "wow_visible"];
   if (MODE === "app") {
     // App profile (references/wow.md "App mode"). Not hard-gated here: type_scale, wow_visible, scale_change, panel_run (measured, kept visible as hit:false) and the page-rhythm

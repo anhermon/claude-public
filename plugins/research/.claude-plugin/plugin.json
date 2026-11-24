@@ -1,5 +1,6 @@
 {
   "name": "research",
+  "version": "1.0.0",
   "description": "Research a topic via AutoResearchClaw (full pipeline) or regular Claude synthesis (fast brief)",
   "author": {
     "name": "Angel Hermon"

@@ -156,7 +156,8 @@ claude-in-chrome) and tabulate h1/h2/body/header/button/section padding/motion. 
 
 ### 3. Direction and type (styles.md, type-systems.md)
 - Choose ONE style recipe from the subject: Swiss/data, terminal-native, tactile consumer, cinematic, editorial
-  dark product, blueprint. Follow its "material by style" row: which sections get generated images, which get
+  dark product, blueprint, e-commerce storefront (any page that sells goods: campaign concept, packshots trimmed onto
+  one plate, on-site quick view, never link products out; Angel's 7 references in styles.md). Follow its "material by style" row: which sections get generated images, which get
   code-drawn figures, whether WebGL is in play.
 - One family carries the page; a second face only as a deliberate voice; mono for code/data only; sentence case.
 - **Palette = restraint** (rubric.md "Saturation and restraint"): large fields neutral or low-chroma (paper, stone,
@@ -230,7 +231,7 @@ An unrunnable gate is `UNVERIFIED` (Hard rules), not a pass.
 In candidates mode this runs once per candidate during a round (record, do not iterate to green), and to green for the picked candidate only.
 1. **Works**: `scripts/serve.mjs` -> `scripts/shoot.sh` (Chrome 1440 + 390 and real Mobile Safari on a private
    Simulator) -> `scripts/lighthouse.sh`. No horizontal scroll, fonts rendered, no console errors, trackers blocked.
-2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (app mode: `MODE=app`, `SECTIONS="[data-screen]"`, no `WOW`; see "App mode"), then the
+2. **Not templaty**: `EVAL=scripts/tells.js SECTIONS=1 WOW=<sel> node scripts/chrome-shot.mjs ...` (one width per call with SECTIONS=1; `1440,390` crashed on 2026-10-13; a scroll-scrubbed wow needs `data-scene` on the WOW element to get scroll frames instead of time frames) (app mode: `MODE=app`, `SECTIONS="[data-screen]"`, no `WOW`; see "App mode"), then the
    fallback frames with a SECOND run `RM=1 WOW=<sel> SHOTS=0 node scripts/chrome-shot.mjs ...` into the SAME out dir (adds `*-rm-tN.png`;
    with RM=1 the report goes to `report-rm.json`, so the gate-2 `report.json` and its eval are never overwritten and no EVAL is needed).
    `WOW_ACT=<js>` starts an interaction. WOW frames are mid-animation (7 time / 6 scroll positions) clocked from the scroll to the

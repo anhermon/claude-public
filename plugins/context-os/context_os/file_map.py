@@ -23,11 +23,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
-    from context_os.cc_lens_url import resolve_cc_lens_base_url
+    from context_os.cc_lens_url import DEFAULT_CC_LENS_URL, resolve_cc_lens_base_url
 except Exception:  # pragma: no cover
+    DEFAULT_CC_LENS_URL = "http://localhost:3001"
+
     def resolve_cc_lens_base_url() -> str:
         import os
-        return os.environ.get("CC_LENS_BASE_URL", "http://localhost:3000").rstrip("/")
+        return os.environ.get("CC_LENS_BASE_URL", DEFAULT_CC_LENS_URL).rstrip("/")
 
 
 READ_LIKE_TOOLS = ("Read", "Edit", "MultiEdit", "Write")
